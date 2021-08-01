@@ -38,7 +38,7 @@ func ConnectToDB(dsn string) *gorm.DB {
 
 	if strings.HasPrefix(dsn, "postgres:") {
 		db, err := gorm.Open(postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true}),
-			&gorm.Config{CreateBatchSize: 1000, Logger: logger.Default.LogMode(logger.Warn)})
+			&gorm.Config{CreateBatchSize: 1000, Logger: logger.Default.LogMode(logger.Info)})
 
 		if err != nil {
 			fmt.Printf("ConnectToDB error: %v\n", err)
@@ -68,4 +68,79 @@ func ConnectToDB(dsn string) *gorm.DB {
 	}
 
 	return nil
+}
+
+type TransactionPOI struct {
+	TrId    uint64    `gorm:"primaryKey" json:"id"`
+	Date    time.Time `json:"date"`
+	Address string    `json:"address"`
+	City    string    `json:"city"`
+	Price   float64   `json:"price"`
+	Area    int       `json:"area"`
+	Lat     float64   `json:"lat"`
+	Long    float64   `json:"long"`
+}
+
+func (TransactionPOI) TableName() string {
+	return "transactions"
+}
+
+func GetPOI(db *gorm.DB, limit, zip, dep int, after string) []TransactionPOI {
+	if db == nil {
+		return nil
+	}
+
+	var pois []TransactionPOI
+
+	whereClause := "lat > 0"
+	if zip > 0 {
+		whereClause = fmt.Sprintf("%v AND zip_code = %v", whereClause, zip)
+	}
+	if dep > 0 {
+		whereClause = fmt.Sprintf("%v AND department_code = %v", whereClause, dep)
+	}
+
+	if after != "" {
+		whereClause = fmt.Sprintf("%v AND date > \"%v\"", whereClause, after)
+	}
+
+	if limit <= 0 {
+		limit = 100
+	}
+
+	result := db.Where(whereClause).Limit(limit).Find(&pois)
+
+	if result.Error != nil {
+		fmt.Printf("err: %v\n", result.Error)
+		return nil
+	}
+
+	return pois
+}
+
+func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit, dep int, after string) []TransactionPOI {
+	var pois []TransactionPOI
+
+	whereClause := fmt.Sprintf("lat < %v AND lat > %v AND long < %v AND long > %v", NElat, SWlat, NELong, SWLong)
+
+	if dep > 0 {
+		whereClause = fmt.Sprintf("%v AND department_code = %v", whereClause, dep)
+	}
+
+	if after != "" {
+		whereClause = fmt.Sprintf("%v AND date > \"%v\"", whereClause, after)
+	}
+
+	if limit <= 0 {
+		limit = 100
+	}
+
+	result := db.Where(whereClause).Limit(limit).Find(&pois)
+
+	if result.Error != nil {
+		fmt.Printf("err: %v\n", result.Error)
+		return nil
+	}
+
+	return pois
 }

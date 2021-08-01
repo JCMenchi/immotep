@@ -114,7 +114,7 @@ func GetLatLong(item *model.Transaction) *model.Transaction {
 
 	geom := info.Features[0].Geometry
 
-	//fmt.Printf("Geometry (%v) %v %v\n", geom, item.Address, item.City)
+	fmt.Printf("Geometry (%v) %v %v\n", geom, item.Address, item.City)
 
 	item.Long = geom.Coordinates[0]
 	item.Lat = geom.Coordinates[1]
@@ -128,7 +128,7 @@ func GeocodeDB(dsn string) {
 
 	// batch size 1000
 	var trans []model.Transaction
-	result := db.Where("lat IS NULL").FindInBatches(&trans, 2000, func(tx *gorm.DB, batch int) error {
+	result := db.Where("department_code = 35").FindInBatches(&trans, 1000, func(tx *gorm.DB, batch int) error {
 
 		nbError := 0
 
@@ -162,7 +162,7 @@ func GeocodeDB(dsn string) {
 
 			if len(row) > 6 {
 				var tr *model.Transaction
-				trid := row[0]
+				trid, _ := strconv.Atoi(row[0])
 
 				lat, err := strconv.ParseFloat(row[4], 64)
 				if err != nil {
@@ -175,7 +175,7 @@ func GeocodeDB(dsn string) {
 					nbError++
 				}
 
-				updresult := db.Model(tr).Where("tr_id = ?", trid).Updates(model.Transaction{Lat: lat, Long: long})
+				updresult := db.Model(tr).Where("tr_id = ?", trid).Updates(map[string]interface{}{"lat": lat, "long": long})
 				if updresult.Error != nil {
 					fmt.Printf("Error GeocodeDB update: %v\n", updresult.Error)
 					nbError++

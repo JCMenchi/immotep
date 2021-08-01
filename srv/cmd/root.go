@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"jc.org/immotep/api"
 	"jc.org/immotep/loader"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -69,10 +70,15 @@ func init() {
 	// create subcommand
 	loadCmd.PersistentFlags().StringP("zipcode-filename", "z", "", "zip code definition file")
 	viper.BindPFlag("zipcode.filename", loadCmd.PersistentFlags().Lookup("zipcode-filename"))
-
 	rootCmd.AddCommand(loadCmd)
 
 	rootCmd.AddCommand(geocodeCmd)
+
+	serveCmd.PersistentFlags().Int("port", 8081, "api server port")
+	viper.BindPFlag("serve.port", serveCmd.PersistentFlags().Lookup("port"))
+	serveCmd.PersistentFlags().String("static", "./static", "asset folder")
+	viper.BindPFlag("serve.static", serveCmd.PersistentFlags().Lookup("static"))
+	rootCmd.AddCommand(serveCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -154,5 +160,19 @@ var geocodeCmd = &cobra.Command{
 		// load data
 		dsn := getDSN()
 		loader.GeocodeDB(dsn)
+	},
+}
+
+// serveCmd represents the serve command
+var serveCmd = &cobra.Command{
+	Use:   "serve",
+	Short: "immotep backend",
+	Long:  `immotep REST API.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		dsn := getDSN()
+		port := viper.GetInt("serve.port")
+		staticDir := viper.GetString("serve.static")
+
+		api.Serve(dsn, staticDir, port)
 	},
 }
