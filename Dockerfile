@@ -9,14 +9,14 @@
 
 FROM golang:1.16.5-alpine AS builder
 
-RUN apk update && apk add git && apk add build-base
+RUN apk --no-cache add git && apk --no-cache add build-base
 
 WORKDIR /src
 COPY ./ui/immotep immotep
 COPY ./srv .
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o immotepsrv .
 
-FROM alpine:latest  
+FROM alpine:3.14  
 RUN apk --no-cache add curl && mkdir /app
 
 WORKDIR /app
