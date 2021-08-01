@@ -1,0 +1,49 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immotep
+  labels:
+    app: immotep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immotep
+  template:
+    metadata:
+      name: immotep-main
+      labels:
+        app: immotep
+    spec:
+      containers:
+        - name: immotep
+          image: eu-zurich-1.ocir.io/zrubfvj5fjty/immotep:1.0.0
+          ports:
+            - name: webui
+              containerPort: 8081
+          resources:
+            requests:
+              cpu: 1500m
+              memory: 1500M
+            limits:
+              cpu: 2500m
+              memory: 2500M
+      imagePullSecrets:
+        - name: ociregistry
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immotep
+  labels:
+    app: immotep
+spec:
+  selector:
+    app: immotep
+  ports:
+    - port: 80
+      targetPort: 8081
+      protocol: TCP
+      name: webui
+  type: LoadBalancer
