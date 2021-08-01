@@ -1,0 +1,11 @@
+@baseurl = http://localhost:8081
+
+###
+POST {{baseurl}}/api/pois/filter?limit=1000 HTTP/1.1
+content-type: application/json
+
+{
+    "northEast": { "lat": 48.72449109301392, "lng": -3.666000366210938 },
+	"southWest": { "lat": 48.451976459625996, "lng": -4.316940307617188 },
+	"after": "2015-01-01"
+}
