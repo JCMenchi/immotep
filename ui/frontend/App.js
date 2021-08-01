@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Route, Switch } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import { CssBaseline, Snackbar, ThemeProvider } from '@material-ui/core';
+import { CssBaseline, IconButton, Grid, Paper, ThemeProvider } from '@material-ui/core';
 import { createTheme } from '@material-ui/core/styles';
+import { Brightness7, Brightness4 } from '@material-ui/icons';
 
+import { selectUITheme, changeUITheme } from './store/uiparamSlice';
+
+import { MapViewer } from './MapViewer';
 import './App.css';
+import Menubar from './Menubar';
 
 /* Style info to use for theming */
 const darkTheme = createTheme({
@@ -30,29 +34,43 @@ export default function App(props) {
   // local state
   const [uiTheme, setUITheme] = useState('dark');
 
+  // get reducer dispatcher
+  const dispatch = useDispatch();
+  const UITheme = useSelector(selectUITheme);
+
   const toggleUITheme = () => {
     if (uiTheme === 'dark') {
+      dispatch(changeUITheme('light'));
       setUITheme('light');
     } else {
+      dispatch(changeUITheme('dark'));
       setUITheme('dark');
     }
   };
 
   return (
 
-    <ThemeProvider theme={uiTheme === 'dark' ? darkTheme : lightTheme}>
+    <ThemeProvider theme={UITheme === 'dark' ? darkTheme : lightTheme}>
       <CssBaseline />
-      <MapContainer center={[51.505, -0.09]} zoom={13} scrollWheelZoom={true}>
-        <TileLayer
-          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <Marker position={[51.505, -0.09]}>
-          <Popup>
-            A pretty CSS3 popup. <br /> Easily customizable.
-          </Popup>
-        </Marker>
-      </MapContainer>
+      <Grid container spacing={1}>
+        <Grid item style={{ width: '100%' }}>
+          <Paper variant='outlined'>
+            <Grid item container direction='row' alignItems='center'>
+              <Grid item >
+                <IconButton size="small" onClick={() => toggleUITheme()} >
+                  {UITheme === 'dark' ? <Brightness4 /> : <Brightness7 />}
+                </IconButton>
+              </Grid>
+              <Grid item style={{ flexGrow: 1 }}>
+                <Menubar/>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+        <Grid item style={{ width: '100%' }}>
+          <MapViewer />
+        </Grid>
+      </Grid>
     </ThemeProvider>
 
   );
