@@ -1,0 +1,4 @@
+clean/
+raw/
+.vscode/
+ui/node_modules/
