@@ -38,24 +38,6 @@ export default function Menubar(props) {
             <Grid item style={{ flexGrow: 1 }}>
                 <TextField
                     type='number'
-                    label={"Limit"}
-                    value={currentLimit}
-                    onChange={(event) => {
-                        setCurrentLimit(event.target.value)
-                    }}
-                    onKeyUp={(event) => {
-                        if (event.key == 'Enter') {
-                            dispatch(changeQueryLimit(Number(currentLimit)));
-                        }
-                    }}
-                    disabled={false}
-                    variant='outlined'
-                    inputProps={{ style: { textAlign: 'right' } }}
-                />
-            </Grid>
-            <Grid item style={{ flexGrow: 1 }}>
-                <TextField
-                    type='number'
                     label={"Departement"}
                     value={currentDep}
                     onChange={(event) => {
@@ -71,12 +53,26 @@ export default function Menubar(props) {
                     inputProps={{ style: { textAlign: 'right' } }}
                 />
             </Grid>
-
-            <Grid item>
-                <Switch checked={showMark} onChange={ () => {dispatch(changeShowMark(!showMark))} } />
+            
+            <Grid item style={{ flexGrow: 1 }}>
+                <TextField
+                    type='number'
+                    label={"Limit"}
+                    value={currentLimit}
+                    onChange={(event) => {
+                        setCurrentLimit(event.target.value)
+                    }}
+                    onKeyUp={(event) => {
+                        if (event.key == 'Enter') {
+                            dispatch(changeQueryLimit(Number(currentLimit)));
+                        }
+                    }}
+                    disabled={false}
+                    variant='outlined'
+                    inputProps={{ style: { textAlign: 'right' } }}
+                />
             </Grid>
-
-
+           
 
         </Grid>
     );

@@ -1,3 +1,33 @@
-.leaflet-container {
-  height: 800px;
+body,html {
+  height:100%;
+  margin:4px;
+  overflow: hidden;
 }
+
+.container {
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+
+.top {
+  background-color:brown;
+  text-align:center;
+}
+  
+.middle {
+    
+        flex-grow:1;
+        overflow-y: auto;
+        min-height: 0px;
+        background-color:yellow;
+        display:flex;
+        flex-direction:column;
+      position:relative;
+}
+
+#mapid {
+  flex-grow:1;
+  z-index:10;
+}
+    

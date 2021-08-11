@@ -52,7 +52,7 @@ export default function App(props) {
 
     <ThemeProvider theme={UITheme === 'dark' ? darkTheme : lightTheme}>
       <CssBaseline />
-      <Grid container spacing={1}>
+      <Grid container direction='column' spacing={1} style={{ height: '100%' }}>
         <Grid item style={{ width: '100%' }}>
           <Paper variant='outlined'>
             <Grid item container direction='row' alignItems='center'>
@@ -67,7 +67,7 @@ export default function App(props) {
             </Grid>
           </Paper>
         </Grid>
-        <Grid item style={{ width: '100%' }}>
+        <Grid item style={{ flexGrow: 1, width: '100%' }}>
           <MapViewer />
         </Grid>
       </Grid>

@@ -1,107 +1,69 @@
-import React, { useState, useEffect } from "react";
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useState } from "react";
+import { LayersControl, LayerGroup, MapContainer, TileLayer } from "react-leaflet";
 
-import { MapContainer, Marker, TileLayer, useMapEvents, Popup } from "react-leaflet";
-import service from './poi_service'
-
-import {
-    changeQueryLimit,
-    changeQueryDepartment,
-    changeShowMark,
-    selectQueryLimit,
-    selectQueryDepartment,
-    selectUIShowMark
-} from './store/uiparamSlice';
-
+import { CityStat } from "./CityStat";
+import { LocationMarker } from "./LocationMarker";
 
 const style = {
-    height: '400px',
+    height: '100%',
     width: '100%'
 };
 
-function LocationMarker() {
+const mbbaseurl = "https://api.mapbox.com/styles/v1/jcmenchi/";
 
-    // state from redux global store
-    const showMark = useSelector(selectUIShowMark);
-    const limit = useSelector(selectQueryLimit);
-    const department = useSelector(selectQueryDepartment);
-
-    const [lastPos, setLastPos] = useState(null)
-    const [info, setInfo] = useState("")
-
-    const [transactions, setTransactions] = useState(null)
-
-    const map = useMapEvents({
-        click(event) {
-            //map.locate()
-            console.log('map point:', event.latlng)
-            console.log('map center:', map.getCenter())
-            console.log('map bounds:', map.getBounds())
-            console.log('map zoom:', map.getZoom())
-            setLastPos(event.latlng)
-            setInfo(`latlong: ${event.latlng.lat}, ${event.latlng.lng}`)
-        },
-
-        moveend(_event) {
-            console.log('moveend map bounds:', map.getBounds())
-            const bounds = {
-                northEast: map.getBounds()._northEast,
-                southWest: map.getBounds()._southWest,
-                code: department
-            }
-
-            // need to reload data with new bounds
-            service.post("api/pois/filter?limit=" + limit, bounds)
-                .then((response) => {
-                    setTransactions(response.data);
-                }).catch((error) => {
-                    console.error('Failed to load pois:', error);
-                });
-        }
-
-    })
-
-    useEffect(() => {
-    }, []);
-
-    return (
-        <div>
-            { lastPos !== null &&
-            <Marker position={lastPos}>
-                <Popup><div>{info}</div></Popup>
-            </Marker>
-            }
-            {showMark && transactions !== null && transactions.map(item => (
-                <Marker key={item.id} riseOnHover={true} position={[item.lat, item.long]} >
-                    <Popup> {`${item.date.split('T')[0]}: ${item.price}€`} <br /> {`${item.area}m²`}<br /> {item.address} <br /> {item.city} </Popup>
-                </Marker>
-            ))}
-        </div>
-    )
-}
-
+const mbtoken = "pk.eyJ1IjoiamNtZW5jaGkiLCJhIjoiY2tyaTQxOXZjMGM4YTJ1cnZ0ZGM0eWdlbSJ9.Cqy-UGrsUUWAGF8mFPUiGg";
 
 export const MapViewer = () => {
     const [position] = useState([48.6007, -4.0451]);// initial position of map
 
     return (
-        <div id="map">
+        <div id="map" style={style}>
             <MapContainer center={position}
                 zoom={10}
+
                 scrollWheelZoom={true}
                 style={style}>
 
-                <TileLayer
-                    attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <LocationMarker />
+                <LayersControl position="topright">
+                    <LayersControl.BaseLayer checked name="Map">
+                        <TileLayer
+                            attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="Satellite">
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
+                            url={mbbaseurl + "ckri48goh6zmf18q98pzmp1q4/tiles/{z}/{x}/{y}?access_token=" + mbtoken}
+                        />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="Light">
+                        <TileLayer
+                            url={'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=' + mbtoken}
+                            id='mapbox/light-v9'
+                            attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
+                            tileSize={512}
+                            zoomOffset={-1}
+                        />
+
+                    </LayersControl.BaseLayer>
+                    <LayersControl.Overlay checked name="Communes Info">
+                        <LayerGroup><CityStat /></LayerGroup>
+                    </LayersControl.Overlay>
+                    <LayersControl.Overlay checked name="Vente">
+                        <LayerGroup>
+                            <LocationMarker />
+                        </LayerGroup>
+                    </LayersControl.Overlay>
+                </LayersControl>
+
             </MapContainer>
         </div>
-        )
+    )
 }
 
 /*
+
 Result of call to GET /api/pois
 [
     {
