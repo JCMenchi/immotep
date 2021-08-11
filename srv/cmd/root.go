@@ -74,9 +74,17 @@ func init() {
 
 	rootCmd.AddCommand(geocodeCmd)
 
-	serveCmd.PersistentFlags().Int("port", 8081, "api server port")
+	loadConfCmd.PersistentFlags().StringP("region", "r", "", "region JSON file")
+	viper.BindPFlag("file.region", loadConfCmd.PersistentFlags().Lookup("region"))
+	loadConfCmd.PersistentFlags().String("department", "", "department JSON file")
+	viper.BindPFlag("file.department", loadConfCmd.PersistentFlags().Lookup("department"))
+	loadConfCmd.PersistentFlags().String("city", "", "city JSON file")
+	viper.BindPFlag("file.city", loadConfCmd.PersistentFlags().Lookup("city"))
+	rootCmd.AddCommand(loadConfCmd)
+
+	serveCmd.PersistentFlags().Int("port", 8080, "api server port")
 	viper.BindPFlag("serve.port", serveCmd.PersistentFlags().Lookup("port"))
-	serveCmd.PersistentFlags().String("static", "./static", "asset folder")
+	serveCmd.PersistentFlags().String("static", "", "asset folder")
 	viper.BindPFlag("serve.static", serveCmd.PersistentFlags().Lookup("static"))
 	rootCmd.AddCommand(serveCmd)
 }
@@ -152,6 +160,31 @@ var loadCmd = &cobra.Command{
 	},
 }
 
+var loadConfCmd = &cobra.Command{
+	Use:   "loadconf",
+	Short: "load config",
+	Long:  `load config`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// load region
+		region := viper.GetString("file.region")
+		department := viper.GetString("file.department")
+		city := viper.GetString("file.city")
+		// load data
+		dsn := getDSN()
+		fmt.Printf("load conf to db: %v\n", dsn)
+
+		if region != "" {
+			loader.LoadRegion(dsn, region)
+		}
+		if department != "" {
+			loader.LoadDepartment(dsn, department)
+		}
+		if city != "" {
+			loader.LoadCity(dsn, city)
+		}
+	},
+}
+
 var geocodeCmd = &cobra.Command{
 	Use:   "geocode",
 	Short: "geocode db",
@@ -172,6 +205,8 @@ var serveCmd = &cobra.Command{
 		dsn := getDSN()
 		port := viper.GetInt("serve.port")
 		staticDir := viper.GetString("serve.static")
+
+		fmt.Printf("load conf to db: %v\n", dsn)
 
 		api.Serve(dsn, staticDir, port)
 	},

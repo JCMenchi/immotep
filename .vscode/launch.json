@@ -14,7 +14,7 @@
             "request": "launch",
             "mode": "auto",
             "cwd": "${workspaceFolder}/srv",
-            "args": ["serve"],
+            "args": ["-f", "./imm.db", "serve"],
             "program": "${workspaceFolder}/srv/main.go",
             "debugAdapter": "dlv-dap"
         },
@@ -25,6 +25,17 @@
             "mode": "auto",
             "cwd": "${workspaceFolder}/srv",
             "args": ["geocode"],
+            "program": "${workspaceFolder}/srv/main.go",
+            "debugAdapter": "dlv-dap"
+        }
+        ,
+        {
+            "name": "loadconf",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}/srv",
+            "args": ["loadconf", "--department", "../raw/departments.json", "--city", "../raw/communes.json"],
             "program": "${workspaceFolder}/srv/main.go",
             "debugAdapter": "dlv-dap"
         }

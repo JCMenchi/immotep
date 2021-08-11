@@ -128,7 +128,7 @@ func GeocodeDB(dsn string) {
 
 	// batch size 1000
 	var trans []model.Transaction
-	result := db.Where("department_code = 35").FindInBatches(&trans, 1000, func(tx *gorm.DB, batch int) error {
+	result := db.Where("lat = 0").FindInBatches(&trans, 1000, func(tx *gorm.DB, batch int) error {
 
 		nbError := 0
 

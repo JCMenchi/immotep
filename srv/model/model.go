@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	geojson "github.com/paulmach/go.geojson"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -22,6 +23,7 @@ type Transaction struct {
 	Address        string `json:"address"`
 	ZipCode        int
 	City           string
+	CityCode       string
 	DepartmentCode string
 	Price          float64
 	PricePSQM      float64
@@ -32,6 +34,29 @@ type Transaction struct {
 	TypeCulture    string
 	Lat            float64
 	Long           float64
+}
+
+type Region struct {
+	Code       string       `gorm:"primaryKey" json:"code"`
+	Name       string       `json:"nom"`
+	Department []Department `gorm:"foreignKey:CodeRegion;references:Code"`
+}
+
+type Department struct {
+	Code       string `gorm:"primaryKey" json:"code"`
+	Name       string `json:"nom"`
+	CodeRegion string `json:"codeRegion"`
+	City       []City `gorm:"foreignKey:CodeDepartment;references:Code"`
+}
+
+type City struct {
+	Code           string `gorm:"primaryKey" json:"code"`
+	Name           string `json:"nom"`
+	ZipCode        int
+	Population     int      `json:"population"`
+	Contour        string   `json:"contour"`
+	CodeDepartment string   `json:"codeDepartement"`
+	CodesPostaux   []string `gorm:"-" json:"codesPostaux"`
 }
 
 func ConnectToDB(dsn string) *gorm.DB {
@@ -45,7 +70,7 @@ func ConnectToDB(dsn string) *gorm.DB {
 			return nil
 		}
 
-		err = db.AutoMigrate(&Transaction{})
+		err = db.AutoMigrate(&Transaction{}, &Region{}, &Department{}, &City{})
 		if err != nil {
 			fmt.Printf("AutoMigrate DB error: %v\n", err.Error())
 			return nil
@@ -62,7 +87,7 @@ func ConnectToDB(dsn string) *gorm.DB {
 			return nil
 		}
 
-		db.AutoMigrate(&Transaction{})
+		db.AutoMigrate(&Transaction{}, &Region{}, &Department{}, &City{})
 
 		return db
 	}
@@ -133,6 +158,8 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit, 
 
 	if limit <= 0 {
 		limit = 100
+	} else if limit > 500 {
+		limit = 500
 	}
 
 	result := db.Where(whereClause).Limit(limit).Find(&pois)
@@ -143,4 +170,62 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit, 
 	}
 
 	return pois
+}
+
+/**
+  SELECT tr.city as name,  avg(price_psqm) as ps, cities.contour as geojson FROM transactions as tr
+  LEFT JOIN cities ON tr.city_code = cities.code WHERE tr.department_code = 29
+  group by tr.city_code;
+
+*/
+type CityInfo struct {
+	Name        string          `json:"name"`
+	AvgPriceSQM float64         `json:"avgprice"`
+	Contour     geojson.Feature `json:"contour"`
+}
+
+func GetCityDetails(db *gorm.DB, limit, dep int) []CityInfo {
+
+	if limit <= 0 {
+		limit = 100
+	}
+
+	var cityinfos []CityInfo = make([]CityInfo, 0, limit)
+
+	rows, err := db.Debug().Select("transactions.city as name, AVG(transactions.price_psqm) as avg_price_psqm, cities.contour as geojson, cities.code as citycode, cities.population as population").
+		Joins("LEFT JOIN cities ON cities.code = transactions.city_code").
+		Where("department_code = ?", dep).
+		Table("transactions").
+		Group("city_code").
+		Limit(limit).Rows()
+
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+		return nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name, geojsonString, code string
+		var avg_price_psqm float64
+		var population int
+		rows.Scan(&name, &avg_price_psqm, &geojsonString, &code, &population)
+
+		var info CityInfo
+		info.Name = name
+		info.AvgPriceSQM = avg_price_psqm
+
+		geom, err := geojson.UnmarshalGeometry([]byte(geojsonString))
+		if err != nil {
+			fmt.Printf("err: %v\n", err)
+		} else {
+			info.Contour.Geometry = geom
+			info.Contour.SetProperty("avgprice", avg_price_psqm)
+			info.Contour.SetProperty("city", code)
+			info.Contour.SetProperty("population", population)
+			cityinfos = append(cityinfos, info)
+		}
+	}
+
+	return cityinfos
 }

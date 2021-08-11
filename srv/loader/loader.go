@@ -2,13 +2,17 @@ package loader
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	geojson "github.com/paulmach/go.geojson"
 	"jc.org/immotep/model"
 )
 
@@ -29,23 +33,23 @@ var COLUMNS_NAME = []string{
 	"Nature culture", "Nature culture speciale", "Surface terrain"}
 
 var DATE_COL = 8
+var TYPE_VENTE_COL = 9
 var PRICE_COL = 10
 var STREET_NUMBER_COL = 11
 var STREET_BIS_COL = 12
 var STREET_TYPE_COL = 13
 var STREET_COL = 15
-var HOUSE_AREA_COL = 38
-var TYPE_VENTE_COL = 9
-var TYPE_BIEN_COL = 36
-var CITY_COL = 17
 var ZIP_COL = 16
+var CITY_COL = 17
 var DEP_COL = 18
 var CITY_CODE_COL = 19
 var SECTION_CADASTRE_COL = 21
 var CADASTRE_COL = 22
-var FULL_AREA_COL = 42
+var TYPE_BIEN_COL = 36
+var HOUSE_AREA_COL = 38
 var NB_ROOM_COL = 39
 var TYPE_CULTURE_COL = 40
+var FULL_AREA_COL = 42
 
 /*
 	Get data from official zipcode list.
@@ -235,6 +239,12 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 
 	item.DepartmentCode = row[DEP_COL]
 
+	depcode := item.DepartmentCode
+	if len(depcode) == 1 {
+		depcode = "0" + depcode
+	}
+	item.CityCode = fmt.Sprintf("%v%v%v", depcode, strings.Repeat("0", 3-len(row[CITY_CODE_COL])), row[CITY_CODE_COL])
+
 	v, err := strconv.ParseFloat(strings.Replace(row[PRICE_COL], ",", ".", 1), 64)
 	if err != nil {
 		// no interested when no price
@@ -308,3 +318,161 @@ from transactions where nb_room = 0 group by department_code) t2
 ON (t1.department_code = t2.department_code);
 
 */
+
+func LoadRegion(dsn string, filename string) error {
+	// Open our jsonFile
+	jsonFile, err := os.Open(filename)
+
+	if err != nil {
+		fmt.Printf("LoadRegion cannot open %v: %v\n", filename, err)
+		return err
+	}
+	defer jsonFile.Close()
+	fmt.Printf("Load region from: %v\n", filename)
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	var regions []model.Region
+
+	err = json.Unmarshal(byteValue, &regions)
+	if err != nil {
+		fmt.Printf("LoadRegion cannot decode JSON file %v: %v\n", filename, err)
+		return err
+	}
+
+	db := model.ConnectToDB(dsn)
+	result := db.Create(&regions)
+
+	if result.Error != nil {
+		fmt.Printf("Error: %v\n", result.Error)
+	}
+
+	return nil
+}
+
+func LoadDepartment(dsn string, filename string) error {
+	// Open our jsonFile
+	jsonFile, err := os.Open(filename)
+
+	if err != nil {
+		fmt.Printf("LoadDepartment cannot open %v: %v\n", filename, err)
+		return err
+	}
+	defer jsonFile.Close()
+	fmt.Printf("Load department from: %v\n", filename)
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	var departments []model.Department
+
+	err = json.Unmarshal(byteValue, &departments)
+	if err != nil {
+		fmt.Printf("LoadDepartment cannot decode JSON file %v: %v\n", filename, err)
+		return err
+	}
+
+	db := model.ConnectToDB(dsn)
+	result := db.CreateInBatches(&departments, 30)
+	if result.Error != nil {
+		fmt.Printf("Error: %v\n", result.Error)
+	}
+
+	return nil
+}
+
+func LoadCity(dsn string, filename string) error {
+	// Open our jsonFile
+	jsonFile, err := os.Open(filename)
+
+	if err != nil {
+		fmt.Printf("LoadCity cannot open %v: %v\n", filename, err)
+		return err
+	}
+	defer jsonFile.Close()
+	fmt.Printf("Load city from: %v\n", filename)
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	var cities []model.City
+
+	err = json.Unmarshal(byteValue, &cities)
+	if err != nil {
+		fmt.Printf("LoadCity cannot decode JSON file %v: %v\n", filename, err)
+		return err
+	}
+
+	db := model.ConnectToDB(dsn)
+	cityBatch := make([]model.City, 0, 100)
+	total := len(cities)
+	for idx, city := range cities {
+		if len(city.CodesPostaux) > 0 {
+			city.ZipCode, _ = strconv.Atoi(city.CodesPostaux[0])
+		}
+		err = GetCityContour(&city)
+		if err != nil {
+			fmt.Printf("LoadCity cannot get contour for %v: %v\n", city.Name, err)
+		} else {
+			cityBatch = append(cityBatch, city)
+			if len(cityBatch) == 100 {
+				fmt.Printf("FLush %v/%v cities\n", idx+1, total)
+				result := db.Create(&cityBatch)
+				if result.Error != nil {
+					fmt.Printf("Error: %v\n", result.Error)
+				}
+				cityBatch = make([]model.City, 0, 100)
+			}
+		}
+	}
+
+	result := db.Create(&cityBatch)
+	if result.Error != nil {
+		fmt.Printf("Error: %v\n", result.Error)
+	}
+
+	return nil
+}
+
+type CityInfo struct {
+	Name    string           `json:"nom"`
+	Code    string           `json:"code"`
+	Contour geojson.Geometry `json:"contour"`
+}
+
+/**
+curl 'https://geo.api.gouv.fr/communes/{codecommune}?fields=code,nom,contour'
+*/
+var geoAPIBaseURL string = "https://geo.api.gouv.fr/communes/"
+
+func GetCityContour(city *model.City) error {
+
+	query := geoAPIBaseURL + city.Code + "?fields=code,nom,contour"
+
+	response, err := http.Get(query)
+	if err != nil {
+		fmt.Printf("GetCityContour error in HTTP GET: %v\n", err)
+		return err
+	}
+	defer response.Body.Close()
+
+	responseData, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		fmt.Printf("GetCityContour error reading body: %v\n", err)
+		return err
+	}
+
+	var info CityInfo
+	err = json.Unmarshal(responseData, &info)
+	if err != nil {
+		fmt.Printf("GetCityContour unmarshalling error: %v\n %v\n", err, string(responseData))
+		return err
+	}
+
+	data, err := json.Marshal(info.Contour)
+	if err != nil {
+		fmt.Printf("GetCityContour cannot marshall contour: %v\n", err)
+		return err
+	}
+	city.Contour = string(data)
+
+	return nil
+}

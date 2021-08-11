@@ -1,7 +1,9 @@
 package api
 
 import (
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 
@@ -13,6 +15,9 @@ import (
 // store Postgresql connection
 var immotepDB *gorm.DB
 var immotepDSN string
+
+//go:embed immotep/*
+var staticFS embed.FS
 
 // Start HTTP server
 func Serve(dsn string, staticDir string, port int) {
@@ -37,7 +42,16 @@ func BuildRouter(dsn, staticDir string) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "UP"})
 	})
 
-	engine.Static("/immotep", staticDir)
+	if staticDir == "" {
+		s, _ := fs.Sub(staticFS, "immotep")
+		engine.StaticFS("/immotep", http.FS(s))
+	} else {
+		engine.Static("/immotep", staticDir)
+	}
+
+	engine.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/immotep")
+	})
 
 	return engine
 }
@@ -63,6 +77,9 @@ type POISQuery struct {
 
 func addRoutes(rg *gin.RouterGroup) {
 
+	/*
+		/pois?zip={}&limit={}&dep={}&after={}
+	*/
 	rg.GET("/pois", func(c *gin.Context) {
 		if immotepDB == nil {
 			immotepDB = model.ConnectToDB(immotepDSN)
@@ -135,4 +152,38 @@ func addRoutes(rg *gin.RouterGroup) {
 		c.JSON(200, pois)
 	})
 
+	/*
+		/city?limit={}&dep={}
+	*/
+	rg.GET("/city", func(c *gin.Context) {
+		if immotepDB == nil {
+			immotepDB = model.ConnectToDB(immotepDSN)
+		}
+
+		zip := -1
+		dep := -1
+		limit := -1
+
+		// get value from query param
+		var param POISQuery
+		if c.ShouldBindQuery(&param) == nil {
+			if param.Limit >= 0 {
+				limit = param.Limit
+			}
+			if param.ZipCode >= 0 {
+				zip = param.ZipCode
+			}
+
+			if param.DepCode >= 0 {
+				dep = param.DepCode
+			}
+		}
+
+		fmt.Printf("%v %v %v\n", zip, dep, limit)
+
+		infos := model.GetCityDetails(immotepDB, limit, dep)
+
+		c.JSON(200, infos)
+
+	})
 }
