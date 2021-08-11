@@ -22,8 +22,7 @@ RUN apk --no-cache add curl && mkdir /app
 WORKDIR /app
 COPY --from=builder /src/immotepsrv ./
 COPY ./srv/imm.db ./
-COPY ./ui/immotep immotep
 
-EXPOSE 8081
+EXPOSE 8080
 
-CMD ["./immotepsrv", "serve", "--static", "./immotep"] 
+CMD ["./immotepsrv", "serve" ] 

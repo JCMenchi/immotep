@@ -19,9 +19,13 @@ spec:
       containers:
         - name: immotep
           image: eu-zurich-1.ocir.io/zrubfvj5fjty/immotep:1.0.0
+          imagePullPolicy: Always
           ports:
             - name: webui
               containerPort: 8081
+          env:
+            - name: IMMOTEP_SERVE_PORT
+              value: "8081"
           resources:
             requests:
               cpu: 1500m

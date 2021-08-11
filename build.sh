@@ -4,15 +4,17 @@ set +x
 export VERSION=0.0.1
 VERSION=$(grep version ui/package.json | cut -d\" -f4)
 export DOCKER_REGISTRY=${DOCKER_REGISTRY:-localhost:5000}
+export FAST_BUILD=0
 
 show_help () {
-    echo "Usage: $0 [-h] [-i ingress] [-r registry]"
+    echo "Usage: $0 [-h] [-f] [-r registry]"
     echo "  Build docker file"
     echo "      -r registry : docker registry (default: ${DOCKER_REGISTRY})"
+    echo "      -f          : fast build"
 }
 # Decode args
 OPTIND=1  # Reset in case getopts has been used previously in the shell.
-while getopts ":h?r:" opt; do
+while getopts ":h?r:f" opt; do
     case "$opt" in
     h|\?)
         show_help
@@ -21,16 +23,43 @@ while getopts ":h?r:" opt; do
     r)  
         export DOCKER_REGISTRY=${OPTARG}
         ;;
+    f)  
+        export FAST_BUILD=1
+        ;;
     esac
 done
+
+if [ "${FAST_BUILD}" != 1 ]; then
+    echo "================ CLEAN ========================="
+    rm -rf ./ui/immotep
+    rm -rf ./srv/api/immotep
+fi
 
 # Build UI application
 (
     cd ui || exit 1
-    npm install --no-optional --no-package-lock
-    npm run build
+    echo "================ UI ========================="
+    if [ ! -d node_modules ]; then
+        echo "Instal node modules"
+        npm install --no-optional --no-package-lock
+        if [ -d immotep ]; then
+            rm -rf immotep
+        fi
+    fi
+    if [ ! -d immotep ]; then
+        echo "Build UI"
+        npm run build
+        if [ -d ../srv/api/immotep ]; then
+            rm -rf ../srv/api/immotep
+        fi
+    fi
+    if [ ! -d ../srv/api/immotep ]; then
+        echo "Copy UI to backend"
+        cp -r immotep ../srv/api/immotep
+    fi
 )
 
+echo "================ BACKEND ========================="
 # Package as container
 docker build -t immotep:"${VERSION}" .
 
@@ -40,4 +69,5 @@ if [ "${DOCKER_REGISTRY}X" != "X" ]; then
     docker push "${DOCKER_REGISTRY}"immotep:"${VERSION}"
 fi
 
-
+echo "================ K8S ========================="
+kubectl apply -f k8s_deploy.yaml
