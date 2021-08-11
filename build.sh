@@ -31,8 +31,13 @@ done
 
 if [ "${FAST_BUILD}" != 1 ]; then
     echo "================ CLEAN ========================="
+    echo "Remove ui/immotep"
     rm -rf ./ui/immotep
+    echo "Remove srv/api/immotep"
     rm -rf ./srv/api/immotep
+    echo "Remove ui/node_modules"
+    rm -rf ./ui/node_modules
+    rm -rf ./ui/package-lock.json
 fi
 
 # Build UI application
@@ -48,7 +53,7 @@ fi
     fi
     if [ ! -d immotep ]; then
         echo "Build UI"
-        npm run build
+        npm run build:dist
         if [ -d ../srv/api/immotep ]; then
             rm -rf ../srv/api/immotep
         fi
