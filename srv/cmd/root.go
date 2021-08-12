@@ -190,9 +190,17 @@ var geocodeCmd = &cobra.Command{
 	Short: "geocode db",
 	Long:  `geocode db`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// load data
+		// geo code address
 		dsn := getDSN()
-		loader.GeocodeDB(dsn)
+		fmt.Printf("geocode db: %v\n", dsn)
+		if len(args) > 0 {
+			for _, a := range args {
+				fmt.Printf("geocode dep: %v\n", a)
+				loader.GeocodeDB(dsn, a)
+			}
+		} else {
+			loader.GeocodeDB(dsn, "")
+		}
 	},
 }
 

@@ -35,7 +35,7 @@
             "request": "launch",
             "mode": "auto",
             "cwd": "${workspaceFolder}/srv",
-            "args": ["loadconf", "--department", "../raw/departments.json", "--city", "../raw/communes.json"],
+            "args": ["loadconf", "-f", "immbzh.db", "loadconf", "--city", "../data/communes.json", "--region", "../data/regions.geojson", "--department", "../data/departements.geojson"],
             "program": "${workspaceFolder}/srv/main.go",
             "debugAdapter": "dlv-dap"
         }

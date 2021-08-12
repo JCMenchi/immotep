@@ -39,6 +39,7 @@ type Transaction struct {
 type Region struct {
 	Code       string       `gorm:"primaryKey" json:"code"`
 	Name       string       `json:"nom"`
+	Contour    string       `json:"contour"`
 	Department []Department `gorm:"foreignKey:CodeRegion;references:Code"`
 }
 
@@ -46,6 +47,7 @@ type Department struct {
 	Code       string `gorm:"primaryKey" json:"code"`
 	Name       string `json:"nom"`
 	CodeRegion string `json:"codeRegion"`
+	Contour    string `json:"contour"`
 	City       []City `gorm:"foreignKey:CodeDepartment;references:Code"`
 }
 
