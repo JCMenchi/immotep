@@ -1,4 +1,6 @@
 clean/
 raw/
+data/
 .vscode/
 ui/node_modules/
+./*.db
