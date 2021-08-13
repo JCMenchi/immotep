@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useSelector } from 'react-redux';
 
 import { GeoJSON, Tooltip } from "react-leaflet";
 import service from './poi_service'
-
-import {
-    selectQueryDepartment
-} from './store/uiparamSlice';
 
 function getColor(v) {
     return v > 3000 ? "#7f0000" :
@@ -20,7 +15,8 @@ function getColor(v) {
                       "#fff7ec";
 }
 
-function computeCityContourStyle(feature) {
+function computeDepartmentContourStyle(feature) {
+    console.log(feature.properties);
     return {
         fillColor: getColor(feature.properties.avgprice),
         weight: 1,
@@ -31,28 +27,25 @@ function computeCityContourStyle(feature) {
     };
 }
 
-export const CityStat = () => {
+export const DepartmentStat = (props) => {
 
-    // state from redux global store
-    const department = useSelector(selectQueryDepartment);
-
-    const [cityInfos, setCityInfos] = useState(null)
+    const [departmentInfos, setDepartmentInfos] = useState(null)
 
     useEffect(() => {
-        service.get("api/cities?limit=600&dep=" + department)
+        service.get("api/departments")
             .then((response) => {
-                setCityInfos(response.data);
+                setDepartmentInfos(response.data);
             }).catch((error) => {
-                console.error('Failed to load city info:', error);
+                console.error('Failed to load Department info:', error);
             });
-    }, [department]);
+    }, []);
 
     return (
         <div>
-            {cityInfos && cityInfos.map(item => (
-                <GeoJSON key={item.name} data={item.contour} style={computeCityContourStyle}>
+            {departmentInfos && departmentInfos.map(item => (
+                <GeoJSON key={item.name} data={item.contour} style={computeDepartmentContourStyle}>
                     <Tooltip>
-                        {`${item.name}: ${item.avgprice.toFixed(0)}€`}
+                        {`(${item.code}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
                     </Tooltip>
                 </GeoJSON>
             ))}

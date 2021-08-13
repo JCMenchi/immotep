@@ -3,6 +3,8 @@ import { LayersControl, LayerGroup, MapContainer, TileLayer } from "react-leafle
 
 import { CityStat } from "./CityStat";
 import { LocationMarker } from "./LocationMarker";
+import { DepartmentStat } from "./DepartmentStat";
+import { RegionStat } from "./RegionStat";
 
 const style = {
     height: '100%',
@@ -47,10 +49,20 @@ export const MapViewer = () => {
                         />
 
                     </LayersControl.BaseLayer>
+
+                    <LayersControl.Overlay name="Region Info">
+                        <LayerGroup><RegionStat /></LayerGroup>
+                    </LayersControl.Overlay>
+
+                    <LayersControl.Overlay name="Department Info">
+                        <LayerGroup><DepartmentStat /></LayerGroup>
+                    </LayersControl.Overlay>
+
                     <LayersControl.Overlay checked name="Communes Info">
                         <LayerGroup><CityStat /></LayerGroup>
                     </LayersControl.Overlay>
-                    <LayersControl.Overlay checked name="Vente">
+                                        
+                    <LayersControl.Overlay name="Vente">
                         <LayerGroup>
                             <LocationMarker />
                         </LayerGroup>

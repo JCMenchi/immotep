@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"jc.org/immotep/api"
 	"jc.org/immotep/loader"
+	"jc.org/immotep/model"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -87,6 +88,8 @@ func init() {
 	serveCmd.PersistentFlags().String("static", "", "asset folder")
 	viper.BindPFlag("serve.static", serveCmd.PersistentFlags().Lookup("static"))
 	rootCmd.AddCommand(serveCmd)
+
+	rootCmd.AddCommand(computeCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -201,6 +204,18 @@ var geocodeCmd = &cobra.Command{
 		} else {
 			loader.GeocodeDB(dsn, "")
 		}
+	},
+}
+
+var computeCmd = &cobra.Command{
+	Use:   "compute",
+	Short: "compute db",
+	Long:  `compute db`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// geo code address
+		dsn := getDSN()
+		fmt.Printf("compute db: %v\n", dsn)
+		model.ComputeStat(dsn)
 	},
 }
 

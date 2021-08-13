@@ -9,7 +9,7 @@ LOGGER.setDefaultLevel("debug");
 /**            Setup AXIOS instance                             */
 /*==============================================================*/
 const axiosInstance = axios.create({
-    timeout: 15000,
+    timeout: 85000,
     headers: { 'content-type': 'application/json' }
 });
 
@@ -30,7 +30,7 @@ axiosInstance.interceptors.request.use(function (config) {
 
 // Add a response interceptor
 axiosInstance.interceptors.response.use(function (response) {
-    LOGGER.debug(`Get response of (${response.config.method}) request to ${response.config.url}:`, response.data);
+    LOGGER.debug(`Get response of (${response.config.method}) request to ${response.config.url}.`);
     return response;
 }, function (error) {
     if (error.response) {

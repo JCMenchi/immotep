@@ -6,8 +6,7 @@ import service from './poi_service'
 
 import {
     selectQueryLimit,
-    selectQueryDepartment,
-    selectUIShowMark
+    selectQueryDepartment
 } from './store/uiparamSlice';
 
 export const LocationMarker = () => {

@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useSelector } from 'react-redux';
 
 import { GeoJSON, Tooltip } from "react-leaflet";
 import service from './poi_service'
-
-import {
-    selectQueryDepartment
-} from './store/uiparamSlice';
 
 function getColor(v) {
     return v > 3000 ? "#7f0000" :
@@ -20,7 +15,8 @@ function getColor(v) {
                       "#fff7ec";
 }
 
-function computeCityContourStyle(feature) {
+function computeRegionContourStyle(feature) {
+    console.log(feature.properties);
     return {
         fillColor: getColor(feature.properties.avgprice),
         weight: 1,
@@ -31,28 +27,25 @@ function computeCityContourStyle(feature) {
     };
 }
 
-export const CityStat = () => {
+export const RegionStat = () => {
 
-    // state from redux global store
-    const department = useSelector(selectQueryDepartment);
-
-    const [cityInfos, setCityInfos] = useState(null)
+    const [regionInfos, setRegionInfos] = useState(null)
 
     useEffect(() => {
-        service.get("api/cities?limit=600&dep=" + department)
+        service.get("api/regions")
             .then((response) => {
-                setCityInfos(response.data);
+                setRegionInfos(response.data);
             }).catch((error) => {
-                console.error('Failed to load city info:', error);
+                console.error('Failed to load Region info:', error);
             });
-    }, [department]);
+    }, []);
 
     return (
         <div>
-            {cityInfos && cityInfos.map(item => (
-                <GeoJSON key={item.name} data={item.contour} style={computeCityContourStyle}>
+            {regionInfos && regionInfos.map(item => (
+                <GeoJSON key={item.name} data={item.contour} style={computeRegionContourStyle}>
                     <Tooltip>
-                        {`${item.name}: ${item.avgprice.toFixed(0)}€`}
+                        {`(${item.code}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
                     </Tooltip>
                 </GeoJSON>
             ))}

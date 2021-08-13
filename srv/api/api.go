@@ -64,14 +64,14 @@ type LatLongInfo struct {
 type FilterInfoBody struct {
 	NorthEast LatLongInfo `json:"northEast" binding:"required"`
 	SouthWest LatLongInfo `json:"southWest" binding:"required"`
-	DepCode   int         `json:"code"`
+	DepCode   string      `json:"code"`
 	After     string      `form:"after"`
 }
 
 type POISQuery struct {
 	Limit   int    `form:"limit"`
 	ZipCode int    `form:"zip"`
-	DepCode int    `form:"dep"`
+	DepCode string `form:"dep"`
 	After   string `form:"after"`
 }
 
@@ -86,7 +86,7 @@ func addRoutes(rg *gin.RouterGroup) {
 		}
 
 		zip := -1
-		dep := -1
+		dep := ""
 		limit := -1
 		after := ""
 
@@ -100,7 +100,7 @@ func addRoutes(rg *gin.RouterGroup) {
 				zip = param.ZipCode
 			}
 
-			if param.DepCode >= 0 {
+			if param.DepCode != "" {
 				dep = param.DepCode
 			}
 
@@ -155,13 +155,13 @@ func addRoutes(rg *gin.RouterGroup) {
 	/*
 		/city?limit={}&dep={}
 	*/
-	rg.GET("/city", func(c *gin.Context) {
+	rg.GET("/cities", func(c *gin.Context) {
 		if immotepDB == nil {
 			immotepDB = model.ConnectToDB(immotepDSN)
 		}
 
 		zip := -1
-		dep := -1
+		dep := ""
 		limit := -1
 
 		// get value from query param
@@ -174,7 +174,7 @@ func addRoutes(rg *gin.RouterGroup) {
 				zip = param.ZipCode
 			}
 
-			if param.DepCode >= 0 {
+			if param.DepCode != "" {
 				dep = param.DepCode
 			}
 		}
@@ -182,6 +182,28 @@ func addRoutes(rg *gin.RouterGroup) {
 		fmt.Printf("%v %v %v\n", zip, dep, limit)
 
 		infos := model.GetCityDetails(immotepDB, limit, dep)
+
+		c.JSON(200, infos)
+
+	})
+
+	rg.GET("/regions", func(c *gin.Context) {
+		if immotepDB == nil {
+			immotepDB = model.ConnectToDB(immotepDSN)
+		}
+
+		infos := model.GetRegionDetails(immotepDB)
+
+		c.JSON(200, infos)
+
+	})
+
+	rg.GET("/departments", func(c *gin.Context) {
+		if immotepDB == nil {
+			immotepDB = model.ConnectToDB(immotepDSN)
+		}
+
+		infos := model.GetDepartmentDetails(immotepDB)
 
 		c.JSON(200, infos)
 

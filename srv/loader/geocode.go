@@ -139,7 +139,7 @@ func GeocodeDB(dsn string, depcode string) {
 
 	// batch size 1000
 	var trans []model.Transaction
-	result := query.FindInBatches(&trans, 1000, func(tx *gorm.DB, batch int) error {
+	result := query.FindInBatches(&trans, 2000, func(tx *gorm.DB, batch int) error {
 
 		nbError := 0
 

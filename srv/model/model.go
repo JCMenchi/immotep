@@ -40,15 +40,17 @@ type Region struct {
 	Code       string       `gorm:"primaryKey" json:"code"`
 	Name       string       `json:"nom"`
 	Contour    string       `json:"contour"`
+	AvgPrice   float64      `json:"avg_price"`
 	Department []Department `gorm:"foreignKey:CodeRegion;references:Code"`
 }
 
 type Department struct {
-	Code       string `gorm:"primaryKey" json:"code"`
-	Name       string `json:"nom"`
-	CodeRegion string `json:"codeRegion"`
-	Contour    string `json:"contour"`
-	City       []City `gorm:"foreignKey:CodeDepartment;references:Code"`
+	Code       string  `gorm:"primaryKey" json:"code"`
+	Name       string  `json:"nom"`
+	CodeRegion string  `json:"codeRegion"`
+	Contour    string  `json:"contour"`
+	AvgPrice   float64 `json:"avg_price"`
+	City       []City  `gorm:"foreignKey:CodeDepartment;references:Code"`
 }
 
 type City struct {
@@ -112,7 +114,7 @@ func (TransactionPOI) TableName() string {
 	return "transactions"
 }
 
-func GetPOI(db *gorm.DB, limit, zip, dep int, after string) []TransactionPOI {
+func GetPOI(db *gorm.DB, limit, zip int, dep string, after string) []TransactionPOI {
 	if db == nil {
 		return nil
 	}
@@ -123,7 +125,7 @@ func GetPOI(db *gorm.DB, limit, zip, dep int, after string) []TransactionPOI {
 	if zip > 0 {
 		whereClause = fmt.Sprintf("%v AND zip_code = %v", whereClause, zip)
 	}
-	if dep > 0 {
+	if dep != "" {
 		whereClause = fmt.Sprintf("%v AND department_code = %v", whereClause, dep)
 	}
 
@@ -145,12 +147,12 @@ func GetPOI(db *gorm.DB, limit, zip, dep int, after string) []TransactionPOI {
 	return pois
 }
 
-func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit, dep int, after string) []TransactionPOI {
+func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int, dep string, after string) []TransactionPOI {
 	var pois []TransactionPOI
 
 	whereClause := fmt.Sprintf("lat < %v AND lat > %v AND long < %v AND long > %v", NElat, SWlat, NELong, SWLong)
 
-	if dep > 0 {
+	if dep != "" {
 		whereClause = fmt.Sprintf("%v AND department_code = %v", whereClause, dep)
 	}
 
@@ -186,7 +188,7 @@ type CityInfo struct {
 	Contour     geojson.Feature `json:"contour"`
 }
 
-func GetCityDetails(db *gorm.DB, limit, dep int) []CityInfo {
+func GetCityDetails(db *gorm.DB, limit int, dep string) []CityInfo {
 
 	if limit <= 0 {
 		limit = 100
@@ -230,4 +232,160 @@ func GetCityDetails(db *gorm.DB, limit, dep int) []CityInfo {
 	}
 
 	return cityinfos
+}
+
+type RegionInfo struct {
+	Code        string           `json:"code"`
+	Name        string           `json:"name"`
+	AvgPriceSQM float64          `json:"avgprice"`
+	Contour     *geojson.Feature `json:"contour"`
+}
+
+func ComputeRegions(db *gorm.DB) {
+	rows, err := db.Debug().Select("regions.name as name, regions.code as code, AVG(transactions.price_psqm) as avg_price_psqm").
+		Joins("LEFT JOIN departments ON departments.code = transactions.department_code").
+		Joins("LEFT JOIN regions ON regions.code = departments.code_region").
+		Table("transactions").
+		Group("regions.code").
+		Rows()
+
+	if err != nil {
+		fmt.Printf("ComputeRegions err: %v\n", err)
+		return
+	}
+	defer rows.Close()
+
+	var reginfos []RegionInfo = make([]RegionInfo, 0, 100)
+
+	for rows.Next() {
+		var code, name string
+		var avg_price_psqm float64
+
+		rows.Scan(&name, &code, &avg_price_psqm)
+		reginfos = append(reginfos, RegionInfo{Code: code, AvgPriceSQM: avg_price_psqm})
+		fmt.Printf("%v: %v\n", name, avg_price_psqm)
+	}
+
+	for _, info := range reginfos {
+
+		updresult := db.Model(Region{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
+		if updresult.Error != nil {
+			fmt.Printf("Error ComputeRegions update: %v\n", updresult.Error)
+		}
+	}
+}
+
+func GetRegionDetails(db *gorm.DB) []RegionInfo {
+
+	var regs []Region
+
+	result := db.Find(&regs)
+
+	if result.Error != nil {
+		fmt.Printf("GetRegionDetails err: %v\n", result.Error)
+		return nil
+	}
+
+	var reginfos []RegionInfo = make([]RegionInfo, 0, len(regs))
+
+	for _, r := range regs {
+		var rinfo RegionInfo
+		rinfo.Name = r.Name
+		rinfo.Code = r.Code
+		rinfo.AvgPriceSQM = r.AvgPrice
+
+		feat, err := geojson.UnmarshalFeature([]byte(r.Contour))
+		if err != nil {
+			fmt.Printf("GetRegionDetails err: %v\n", err)
+		} else {
+			rinfo.Contour = feat
+			rinfo.Contour.SetProperty("avgprice", rinfo.AvgPriceSQM)
+			rinfo.Contour.SetProperty("name", rinfo.Name)
+		}
+
+		reginfos = append(reginfos, rinfo)
+	}
+
+	return reginfos
+}
+
+type DepartmentInfo struct {
+	Name        string           `json:"name"`
+	Code        string           `json:"code"`
+	AvgPriceSQM float64          `json:"avgprice"`
+	Contour     *geojson.Feature `json:"contour"`
+}
+
+func ComputeDepartments(db *gorm.DB) {
+
+	rows, err := db.Debug().Select("departments.code as code, AVG(transactions.price_psqm) as avg_price_psqm").
+		Joins("LEFT JOIN departments ON departments.code = transactions.department_code").
+		Table("transactions").
+		Group("departments.code").
+		Rows()
+
+	if err != nil {
+		fmt.Printf("ComputeDepartments err: %v\n", err)
+		return
+	}
+	defer rows.Close()
+
+	var depinfos []DepartmentInfo = make([]DepartmentInfo, 0, 100)
+
+	for rows.Next() {
+		var code string
+		var avg_price_psqm float64
+
+		rows.Scan(&code, &avg_price_psqm)
+		depinfos = append(depinfos, DepartmentInfo{Code: code, AvgPriceSQM: avg_price_psqm})
+		fmt.Printf("%v: %v\n", code, avg_price_psqm)
+	}
+
+	for _, info := range depinfos {
+
+		updresult := db.Model(Department{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
+		if updresult.Error != nil {
+			fmt.Printf("Error ComputeDepartments update: %v\n", updresult.Error)
+		}
+	}
+}
+
+func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
+
+	var deps []Department
+
+	result := db.Find(&deps)
+
+	if result.Error != nil {
+		fmt.Printf("GetDepartmentDetails err: %v\n", result.Error)
+		return nil
+	}
+
+	var depinfos []DepartmentInfo = make([]DepartmentInfo, 0, len(deps))
+
+	for _, d := range deps {
+		var dinfo DepartmentInfo
+		dinfo.Name = d.Name
+		dinfo.Code = d.Code
+		dinfo.AvgPriceSQM = d.AvgPrice
+
+		feat, err := geojson.UnmarshalFeature([]byte(d.Contour))
+		if err != nil {
+			fmt.Printf("GetDepartmentDetails err: %v\n", err)
+		} else {
+			dinfo.Contour = feat
+			dinfo.Contour.SetProperty("avgprice", dinfo.AvgPriceSQM)
+			dinfo.Contour.SetProperty("name", dinfo.Name)
+		}
+
+		depinfos = append(depinfos, dinfo)
+	}
+
+	return depinfos
+}
+
+func ComputeStat(dsn string) {
+	db := ConnectToDB(dsn)
+	ComputeRegions(db)
+	ComputeDepartments(db)
 }
