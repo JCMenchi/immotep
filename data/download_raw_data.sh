@@ -21,14 +21,6 @@ if [ ! -f regions.geojson ]; then
     curl 'https://datanova.legroupe.laposte.fr/explore/dataset/georef-france-region/download/?format=geojson&timezone=Europe/Berlin' > regions.geojson
 fi
 
-if [ ! -f regions.json ]; then
-    curl 'https://geo.api.gouv.fr/regions' > regions.json
-fi
-
-if [ ! -f departements.json ]; then
-    curl 'https://geo.api.gouv.fr/departements' > departements.json
-fi
-
 if [ ! -f departements.geojson ]; then
     curl 'https://datanova.legroupe.laposte.fr/explore/dataset/georef-france-departement/download/?format=geojson&timezone=Europe/Berlin' > departements.geojson
 fi
@@ -64,10 +56,21 @@ if [ ! -f valeursfoncieres-2016.txt ]; then
     curl ${DVF_BASE_URL}101325/valeursfoncieres-2016.txt > valeursfoncieres-2016.txt
 fi
 
+# build exe
+if [ ! -f immotep ]; then
+    if [ ! -f ../srv/api/immotep ]; then
+        rm -rf ../srv/api/immotep
+    fi
+    (cd ../ui || return; npm install; npm run build:dist)
+    mv ../ui/immotep ../srv/api
+    (cd ../srv || return; go build)
+    mv ../srv/immotep .
+fi
 
 # Build database from raw data
-if [ ! -f immbzh.db ]; then
-    ../srv/immotep -f immbzh.db loadconf --region regions.geojson --department departements.geojson --city communes.json
-    ../srv/immotep -f immbzh.db load -z zip_code.csv valeursfoncieres-20*.txt
-    ../srv/immotep -f immbzh.db geocode
+if [ ! -f imm.db ]; then
+    ./immotep -f imm.db loadconf --region regions.geojson --department departements.geojson --city communes.json
+    ./immotep -f imm.db load -z zip_code.csv valeursfoncieres-20*.txt
+    ./immotep -f imm.db geocode
+    ./immotep -f imm.db compute
 fi

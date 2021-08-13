@@ -17,9 +17,11 @@ COPY ./srv .
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o immotepsrv .
 
 FROM alpine:3.14  
-RUN apk --no-cache add curl && mkdir /app
+RUN apk --no-cache add curl && adduser immotep -D -h /app
 
+USER immotep
 WORKDIR /app
+
 COPY --from=builder /src/immotepsrv ./
 COPY ./srv/imm.db ./
 

@@ -30,9 +30,11 @@ spec:
             requests:
               cpu: 1500m
               memory: 1500M
+              ephemeral-storage: "1Gi"
             limits:
               cpu: 2500m
               memory: 2500M
+              ephemeral-storage: "2Gi"
       imagePullSecrets:
         - name: ociregistry
 ---
