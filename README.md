@@ -15,8 +15,7 @@ Pour les lignes haute tension
 Pour les limites departements et ville
 <https://geo.api.gouv.fr/decoupage-administratif/communes>
 
-https://geo.api.gouv.fr/communes?lat=48.838052499999996&lon=2.7151414&fields=code,nom,codesPostaux,surface,population,centre,contour
-
+<https://geo.api.gouv.fr/communes?lat=48.838052499999996&lon=2.7151414&fields=code,nom,codesPostaux,surface,population,centre,contour>
 
 Get all regions
 curl 'https://geo.api.gouv.fr/regions'
