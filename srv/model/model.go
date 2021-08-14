@@ -148,8 +148,15 @@ func GetPOI(db *gorm.DB, limit, zip int, dep string, after string) []Transaction
 	return pois
 }
 
-func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int, dep string, after string) []TransactionPOI {
-	var pois []TransactionPOI
+type BoundedTransactionInfo struct {
+	Trans       []TransactionPOI `json:"transactions"`
+	AvgPrice    float64          `json:"avgprice"`
+	AvgPriceSQM float64          `json:"avgprice_sqm"`
+}
+
+func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int, dep string, after string) *BoundedTransactionInfo {
+
+	var info BoundedTransactionInfo
 
 	whereClause := fmt.Sprintf("lat < %v AND lat > %v AND long < %v AND long > %v", NElat, SWlat, NELong, SWLong)
 
@@ -167,14 +174,34 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 		limit = 500
 	}
 
-	result := db.Where(whereClause).Limit(limit).Find(&pois)
+	result := db.Where(whereClause).Limit(limit).Find(&info.Trans)
 
 	if result.Error != nil {
 		fmt.Printf("GetPOIFromBounds err: %v\n", result.Error)
 		return nil
 	}
 
-	return pois
+	rows, err := db.Debug().Select("AVG(transactions.price) as avg_price, AVG(transactions.price_psqm) as avg_price_psqm").
+		Where("lat < ? AND lat > ? AND long < ? AND long > ?", NElat, SWlat, NELong, SWLong).
+		Table("transactions").
+		Rows()
+
+	if err != nil {
+		fmt.Printf("GetPOIFromBounds err: %v\n", err)
+		return nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var avg_price, avg_price_psqm float64
+
+		rows.Scan(&avg_price, &avg_price_psqm)
+
+		info.AvgPrice = avg_price
+		info.AvgPriceSQM = avg_price_psqm
+	}
+
+	return &info
 }
 
 /**

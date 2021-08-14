@@ -9,7 +9,8 @@ export const uiParam = createSlice({
     theme: localStorage.getItem('ui_theme') || "dark",
     lang: localStorage.getItem('ui_lang') || "",
     showMark: localStorage.getItem('ui_mark') || false,
-    avgPrice: 0
+    avgPrice: -1,
+    avgPriceSQM: -1
   },
   reducers: {
     changeQueryLimit(state, action) {
@@ -34,11 +35,14 @@ export const uiParam = createSlice({
     },
     changeAvgPrice(state, action) {
       state.avgPrice = action.payload;
+    },
+    changeAvgPriceSQM(state, action) {
+      state.avgPriceSQM = action.payload;
     }
   }
 });
 
-export const { changeQueryLimit, changeQueryDepartment, changeUITheme, changeUILanguage, changeShowMark, changeAvgPrice } = uiParam.actions;
+export const { changeQueryLimit, changeQueryDepartment, changeUITheme, changeUILanguage, changeShowMark, changeAvgPrice, changeAvgPriceSQM } = uiParam.actions;
 
 // some selector
 export const selectUITheme = state => state.uiParam.theme;
@@ -47,3 +51,4 @@ export const selectQueryLimit = state => state.uiParam.queryLimit;
 export const selectQueryDepartment = state => state.uiParam.queryDepartment;
 export const selectUIShowMark = state => state.uiParam.showMark;
 export const selectAvgPrice = state => state.uiParam.avgPrice;
+export const selectAvgPriceSQM = state => state.uiParam.avgPriceSQM;

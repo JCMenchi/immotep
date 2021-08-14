@@ -6,6 +6,7 @@ import service from './poi_service'
 
 import {
     changeAvgPrice,
+    changeAvgPriceSQM,
     selectQueryLimit,
     selectQueryDepartment
 } from './store/uiparamSlice';
@@ -47,19 +48,19 @@ export const LocationMarker = () => {
             service.post("api/pois/filter?limit=" + limit, bounds)
                 .then((response) => {
                     const tr = response.data;
-                    setTransactions(tr);
+                    setTransactions(tr.transactions);
 
-                    if (tr.length > 0) {
-                        let price = 0;
-
-                        for (const t of tr) {
-                            price = price + t.price
-                        }
-
-                        dispatch(changeAvgPrice(price / tr.length));
+                    if (tr.avgprice > 0) {
+                        dispatch(changeAvgPrice(tr.avgprice));
                     } else {
                         dispatch(changeAvgPrice(-1));
                     }
+                    if (tr.avgprice_sqm > 0) {
+                        dispatch(changeAvgPriceSQM(tr.avgprice_sqm));
+                    } else {
+                        dispatch(changeAvgPriceSQM(-1));
+                    }
+
                 }).catch((error) => {
                     console.error('Failed to load pois:', error);
                 });

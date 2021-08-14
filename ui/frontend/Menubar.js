@@ -8,7 +8,8 @@ import {
     changeQueryDepartment,
     selectQueryLimit,
     selectQueryDepartment,
-    selectAvgPrice
+    selectAvgPrice,
+    selectAvgPriceSQM
 } from './store/uiparamSlice';
 
 
@@ -17,6 +18,7 @@ export default function Menubar() {
     const limit = useSelector(selectQueryLimit);
     const department = useSelector(selectQueryDepartment);
     const avgprice = useSelector(selectAvgPrice);
+    const avgpriceSQM = useSelector(selectAvgPriceSQM);
 
     // get reducer dispatcher
     const dispatch = useDispatch();
@@ -28,7 +30,10 @@ export default function Menubar() {
 
         <Grid container spacing={1} direction='row' alignItems='center' style={{ paddingTop: 8, paddingBottom: 8 }}>
             <Grid item>
-                <Typography variant='h5'>{avgprice > 0 && `Prix Moyen: ${avgprice.toFixed(0)} € `}</Typography>
+                <Typography variant='h5'>
+                    {avgprice > 0 && `Prix Moyen: ${avgprice.toFixed(0)} € `}
+                    {avgpriceSQM > 0 && ` ${avgpriceSQM.toFixed(0)} €/m² `}
+                </Typography>
             </Grid>
 
             <Grid item style={{ flexGrow: 1 }}>
