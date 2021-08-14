@@ -60,6 +60,7 @@ type City struct {
 	Population     int      `json:"population"`
 	Contour        string   `json:"contour"`
 	CodeDepartment string   `json:"codeDepartement"`
+	AvgPrice       float64  `json:"avg_price"`
 	CodesPostaux   []string `gorm:"-" json:"codesPostaux"`
 }
 
@@ -140,7 +141,7 @@ func GetPOI(db *gorm.DB, limit, zip int, dep string, after string) []Transaction
 	result := db.Where(whereClause).Limit(limit).Find(&pois)
 
 	if result.Error != nil {
-		fmt.Printf("err: %v\n", result.Error)
+		fmt.Printf("GetPOI err: %v\n", result.Error)
 		return nil
 	}
 
@@ -169,7 +170,7 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 	result := db.Where(whereClause).Limit(limit).Find(&pois)
 
 	if result.Error != nil {
-		fmt.Printf("err: %v\n", result.Error)
+		fmt.Printf("GetPOIFromBounds err: %v\n", result.Error)
 		return nil
 	}
 
@@ -184,49 +185,39 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 */
 type CityInfo struct {
 	Name        string          `json:"name"`
+	Code        string          `json:"code"`
+	ZipCode     int             `json:"zip"`
 	AvgPriceSQM float64         `json:"avgprice"`
 	Contour     geojson.Feature `json:"contour"`
 }
 
-func GetCityDetails(db *gorm.DB, limit int, dep string) []CityInfo {
+func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
+	var cities []City
 
-	if limit <= 0 {
-		limit = 100
-	}
+	result := db.Where("code_department = ?", dep).Find(&cities)
 
-	var cityinfos []CityInfo = make([]CityInfo, 0, limit)
-
-	rows, err := db.Debug().Select("transactions.city as name, AVG(transactions.price_psqm) as avg_price_psqm, cities.contour as geojson, cities.code as citycode, cities.population as population").
-		Joins("LEFT JOIN cities ON cities.code = transactions.city_code").
-		Where("department_code = ?", dep).
-		Table("transactions").
-		Group("city_code").
-		Limit(limit).Rows()
-
-	if err != nil {
-		fmt.Printf("err: %v\n", err)
+	if result.Error != nil {
+		fmt.Printf("GetRegionDetails err: %v\n", result.Error)
 		return nil
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var name, geojsonString, code string
-		var avg_price_psqm float64
-		var population int
-		rows.Scan(&name, &avg_price_psqm, &geojsonString, &code, &population)
+	var cityinfos []CityInfo = make([]CityInfo, 0, len(cities))
 
+	for _, c := range cities {
 		var info CityInfo
-		info.Name = name
-		info.AvgPriceSQM = avg_price_psqm
+		info.Name = c.Name
+		info.Code = c.Code
+		info.ZipCode = c.ZipCode
+		info.AvgPriceSQM = c.AvgPrice
 
-		geom, err := geojson.UnmarshalGeometry([]byte(geojsonString))
+		geom, err := geojson.UnmarshalGeometry([]byte(c.Contour))
 		if err != nil {
-			fmt.Printf("err: %v\n", err)
+			fmt.Printf("GetCityDetails UnmarshalGeometry err: %v\n", err)
 		} else {
 			info.Contour.Geometry = geom
-			info.Contour.SetProperty("avgprice", avg_price_psqm)
-			info.Contour.SetProperty("city", code)
-			info.Contour.SetProperty("population", population)
+			info.Contour.SetProperty("avgprice", c.AvgPrice)
+			info.Contour.SetProperty("city", c.Code)
+			info.Contour.SetProperty("population", c.Population)
 			cityinfos = append(cityinfos, info)
 		}
 	}
@@ -384,8 +375,42 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 	return depinfos
 }
 
+func ComputeCities(db *gorm.DB) {
+
+	rows, err := db.Debug().Select("transactions.city_code as code, AVG(transactions.price_psqm) as avg_price_psqm").
+		Table("transactions").
+		Group("city_code").
+		Rows()
+
+	if err != nil {
+		fmt.Printf("ComputeCities err: %v\n", err)
+		return
+	}
+	defer rows.Close()
+
+	var cityinfos []CityInfo = make([]CityInfo, 0, 100)
+
+	for rows.Next() {
+		var code string
+		var avg_price_psqm float64
+
+		rows.Scan(&code, &avg_price_psqm)
+		cityinfos = append(cityinfos, CityInfo{Code: code, AvgPriceSQM: avg_price_psqm})
+		fmt.Printf("%v: %v\n", code, avg_price_psqm)
+	}
+
+	for _, info := range cityinfos {
+
+		updresult := db.Model(City{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
+		if updresult.Error != nil {
+			fmt.Printf("Error ComputeCities update: %v\n", updresult.Error)
+		}
+	}
+}
+
 func ComputeStat(dsn string) {
 	db := ConnectToDB(dsn)
 	ComputeRegions(db)
 	ComputeDepartments(db)
+	ComputeCities(db)
 }

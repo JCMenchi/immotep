@@ -5,7 +5,7 @@ export const uiParam = createSlice({
   name: 'uiParam',
   initialState: {
     queryLimit: localStorage.getItem('query_limit') || 100,
-    queryDepartment: localStorage.getItem('query_department') || 29,
+    queryDepartment: localStorage.getItem('query_department') || "29",
     theme: localStorage.getItem('ui_theme') || "dark",
     lang: localStorage.getItem('ui_lang') || "",
     showMark: localStorage.getItem('ui_mark') || false

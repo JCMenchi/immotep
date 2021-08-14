@@ -43,9 +43,11 @@ func BuildRouter(dsn, staticDir string) *gin.Engine {
 	})
 
 	if staticDir == "" {
+		fmt.Printf("Serve static data internally.\n")
 		s, _ := fs.Sub(staticFS, "immotep")
 		engine.StaticFS("/immotep", http.FS(s))
 	} else {
+		fmt.Printf("Serve static data from: %v\n", staticDir)
 		engine.Static("/immotep", staticDir)
 	}
 
@@ -135,7 +137,7 @@ func addRoutes(rg *gin.RouterGroup) {
 		var body FilterInfoBody
 		err := c.BindJSON(&body)
 		if err != nil {
-			log.Printf("Error in POST /players: %v\n", err)
+			log.Printf("Error in POST /pois/filter: %v\n", err)
 			c.JSON(500, "")
 			return
 		}
@@ -160,28 +162,19 @@ func addRoutes(rg *gin.RouterGroup) {
 			immotepDB = model.ConnectToDB(immotepDSN)
 		}
 
-		zip := -1
 		dep := ""
-		limit := -1
 
 		// get value from query param
 		var param POISQuery
 		if c.ShouldBindQuery(&param) == nil {
-			if param.Limit >= 0 {
-				limit = param.Limit
-			}
-			if param.ZipCode >= 0 {
-				zip = param.ZipCode
-			}
-
 			if param.DepCode != "" {
 				dep = param.DepCode
 			}
 		}
 
-		fmt.Printf("%v %v %v\n", zip, dep, limit)
+		fmt.Printf("Get city info for dep %v\n", dep)
 
-		infos := model.GetCityDetails(immotepDB, limit, dep)
+		infos := model.GetCityDetails(immotepDB, dep)
 
 		c.JSON(200, infos)
 

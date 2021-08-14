@@ -36,7 +36,10 @@ export default function Menubar() {
                     label={"Departement"}
                     value={currentDep}
                     onChange={(event) => {
-                        setCurrentDep(event.target.value)
+                        setCurrentDep(event.target.value);
+                    }}
+                    onBlur={(event) => {
+                        dispatch(changeQueryDepartment(currentDep));
                     }}
                     onKeyUp={(event) => {
                         if (event.key == 'Enter') {
