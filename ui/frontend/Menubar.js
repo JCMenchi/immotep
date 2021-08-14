@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 
 import { Grid, TextField, Typography } from '@material-ui/core';
@@ -8,7 +8,7 @@ import {
     changeQueryDepartment,
     selectQueryLimit,
     selectQueryDepartment,
-    selectUIShowMark
+    selectAvgPrice
 } from './store/uiparamSlice';
 
 
@@ -16,7 +16,8 @@ export default function Menubar() {
     // state from redux global store
     const limit = useSelector(selectQueryLimit);
     const department = useSelector(selectQueryDepartment);
-   
+    const avgprice = useSelector(selectAvgPrice);
+
     // get reducer dispatcher
     const dispatch = useDispatch();
 
@@ -27,7 +28,7 @@ export default function Menubar() {
 
         <Grid container spacing={1} direction='row' alignItems='center' style={{ paddingTop: 8, paddingBottom: 8 }}>
             <Grid item>
-                <Typography variant='h5'>{"Map"}</Typography>
+                <Typography variant='h5'>{avgprice > 0 && `Prix Moyen: ${avgprice.toFixed(0)} € `}</Typography>
             </Grid>
 
             <Grid item style={{ flexGrow: 1 }}>

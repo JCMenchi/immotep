@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 
 import { Marker, useMapEvents, Popup } from "react-leaflet";
 import service from './poi_service'
 
 import {
+    changeAvgPrice,
     selectQueryLimit,
     selectQueryDepartment
 } from './store/uiparamSlice';
@@ -14,6 +15,9 @@ export const LocationMarker = () => {
     // state from redux global store
     const limit = useSelector(selectQueryLimit);
     const department = useSelector(selectQueryDepartment);
+
+    // get reducer dispatcher
+    const dispatch = useDispatch();
 
     const [lastPos, setLastPos] = useState(null)
     const [info, setInfo] = useState("")
@@ -42,7 +46,20 @@ export const LocationMarker = () => {
             // need to reload data with new bounds
             service.post("api/pois/filter?limit=" + limit, bounds)
                 .then((response) => {
-                    setTransactions(response.data);
+                    const tr = response.data;
+                    setTransactions(tr);
+
+                    if (tr.length > 0) {
+                        let price = 0;
+
+                        for (const t of tr) {
+                            price = price + t.price
+                        }
+
+                        dispatch(changeAvgPrice(price / tr.length));
+                    } else {
+                        dispatch(changeAvgPrice(-1));
+                    }
                 }).catch((error) => {
                     console.error('Failed to load pois:', error);
                 });

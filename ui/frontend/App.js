@@ -56,13 +56,13 @@ export default function App(props) {
         <Grid item style={{ width: '100%' }}>
           <Paper variant='outlined'>
             <Grid item container direction='row' alignItems='center'>
+              <Grid item style={{ flexGrow: 1 }}>
+                <Menubar/>
+              </Grid>
               <Grid item >
                 <IconButton size="small" onClick={() => toggleUITheme()} >
                   {UITheme === 'dark' ? <Brightness4 /> : <Brightness7 />}
                 </IconButton>
-              </Grid>
-              <Grid item style={{ flexGrow: 1 }}>
-                <Menubar/>
               </Grid>
             </Grid>
           </Paper>
