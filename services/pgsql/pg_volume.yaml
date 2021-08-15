@@ -1,0 +1,12 @@
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pg-local-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "oci-bv"
+  resources:
+    requests:
+      storage: 2Gi
