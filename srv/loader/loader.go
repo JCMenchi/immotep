@@ -125,7 +125,6 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 	}
 
 	db := model.ConnectToDB(dsn)
-	doStore := true
 
 	// init counter
 	nbData := 0
@@ -134,6 +133,9 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 	nbDuplicate := 0
 
 	var previousRow []string
+
+	batchSize := 50000
+	transBatch := make([]*model.Transaction, 0, batchSize)
 
 	for {
 		row, err := reader.Read()
@@ -149,15 +151,14 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 				item := createTransaction(row, zipCodeMap)
 				if item != nil {
 					nbHouse++
+					transBatch = append(transBatch, item)
 
-					if doStore {
-						result := db.Create(item)
+					if len(transBatch) == batchSize {
+						result := db.Create(&transBatch)
 						if result.Error != nil {
 							fmt.Printf("Error: %v\n", result.Error)
 						}
-					}
-
-					if nbHouse%50000 == 0 {
+						transBatch = make([]*model.Transaction, 0, batchSize)
 						fmt.Printf("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
 					}
 				} else {
@@ -175,6 +176,15 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 			fmt.Println(err)
 		}
 	}
+
+	if len(transBatch) > 0 {
+		result := db.Create(&transBatch)
+		if result.Error != nil {
+			fmt.Printf("Error: %v\n", result.Error)
+		}
+		fmt.Printf("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
+	}
+
 	fmt.Printf("File total rows: %v, data: %v, data with error: %v, duplicate: %v\n\n", nbData, nbHouse, nbHouseWithError, nbDuplicate)
 
 	/*fmt.Printf("Errors:")
@@ -470,17 +480,23 @@ func LoadDepartment(dsn string, filename string) error {
 		if err != nil {
 			fmt.Printf("LoadDepartment cannot read property reg_code: %v\n", err)
 		}
-		data, err := json.Marshal(feature)
-		if err != nil {
-			fmt.Printf("LoadDepartment cannot marshall contour: %v\n", err)
-		} else {
-			d.Contour = string(data)
-		}
 
-		departments = append(departments, d)
+		regcode, err := strconv.Atoi(d.CodeRegion)
+
+		// only metropolitan dep
+		if err == nil && regcode >= 11 && regcode <= 94 {
+			data, err := json.Marshal(feature)
+			if err != nil {
+				fmt.Printf("LoadDepartment cannot marshall contour: %v\n", err)
+			} else {
+				d.Contour = string(data)
+			}
+
+			departments = append(departments, d)
+		}
 	}
 
-	result = db.CreateInBatches(&departments, 30)
+	result = db.CreateInBatches(&departments, 10)
 	if result.Error != nil {
 		fmt.Printf("Error: %v\n", result.Error)
 	}

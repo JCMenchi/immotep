@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"jc.org/immotep/model"
 )
 
@@ -137,9 +138,10 @@ func GeocodeDB(dsn string, depcode string) {
 	query.Table("transactions").Count(&count)
 	nbprocessed := 0
 
-	// batch size 1000
+	// batch size 2000
+	batchSize := 5000
 	var trans []model.Transaction
-	result := query.FindInBatches(&trans, 2000, func(tx *gorm.DB, batch int) error {
+	result := query.FindInBatches(&trans, batchSize, func(tx *gorm.DB, batch int) error {
 
 		nbError := 0
 
@@ -164,6 +166,8 @@ func GeocodeDB(dsn string, depcode string) {
 		}
 
 		// parse result
+		var tr2update = make([]map[string]interface{}, 0, batchSize)
+
 		for {
 			row, err := csvread.Read()
 			// Stop at EOF.
@@ -172,7 +176,7 @@ func GeocodeDB(dsn string, depcode string) {
 			}
 
 			if len(row) > 6 {
-				var tr *model.Transaction
+
 				trid, _ := strconv.Atoi(row[0])
 
 				lat, err := strconv.ParseFloat(row[4], 64)
@@ -185,19 +189,27 @@ func GeocodeDB(dsn string, depcode string) {
 					fmt.Printf("GeocodeDB No long: (%v)  %v\n", row[5], row)
 				}
 
-				updresult := db.Model(tr).Where("tr_id = ?", trid).Updates(map[string]interface{}{"lat": lat, "long": long})
-				if updresult.Error != nil {
-					fmt.Printf("Error GeocodeDB update: %v\n", updresult.Error)
-					nbError++
-				} else {
-					nbprocessed++
-				}
+				tr2update = append(tr2update, map[string]interface{}{"tr_id": trid, "lat": lat, "long": long})
 
 			} else {
 				fmt.Printf("Cannot geocode: %v\n", row)
 				nbError++
 			}
 		}
+
+		// bulk update
+		updresult := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "tr_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"lat", "long"}),
+		}).Table("transactions").Create(&tr2update)
+
+		if updresult.Error != nil {
+			fmt.Printf("Error GeocodeDB update: %v\n", updresult.Error)
+			nbError++
+		} else {
+			nbprocessed += int(updresult.RowsAffected)
+		}
+
 		fmt.Printf("[%v] GeocodeDB processed batch %v (size %v) elt %v/%v, err: %v\n", time.Now().Format("15:04:05"), batch, len(trans), nbprocessed, count, nbError)
 		return nil
 	})

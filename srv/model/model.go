@@ -9,6 +9,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -68,7 +69,7 @@ func ConnectToDB(dsn string) *gorm.DB {
 
 	if strings.HasPrefix(dsn, "postgres:") {
 		db, err := gorm.Open(postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true}),
-			&gorm.Config{CreateBatchSize: 1000, Logger: logger.Default.LogMode(logger.Info)})
+			&gorm.Config{CreateBatchSize: 1000, Logger: logger.Default.LogMode(logger.Error)})
 
 		if err != nil {
 			fmt.Printf("ConnectToDB error: %v\n", err)
@@ -415,24 +416,53 @@ func ComputeCities(db *gorm.DB) {
 	}
 	defer rows.Close()
 
-	var cityinfos []CityInfo = make([]CityInfo, 0, 100)
+	//var cityinfos []CityInfo = make([]CityInfo, 0, 100)
+
+	batchSize := 1000
+	var city2update = make([]map[string]interface{}, 0, batchSize)
 
 	for rows.Next() {
 		var code string
 		var avg_price_psqm float64
 
 		rows.Scan(&code, &avg_price_psqm)
-		cityinfos = append(cityinfos, CityInfo{Code: code, AvgPriceSQM: avg_price_psqm})
+
+		city2update = append(city2update, map[string]interface{}{"code": code, "avg_price": avg_price_psqm})
+		if len(city2update) == batchSize {
+			updresult := db.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "code"}},
+				DoUpdates: clause.AssignmentColumns([]string{"avg_price"}),
+			}).Table("cities").Create(&city2update)
+
+			if updresult.Error != nil {
+				fmt.Printf("Error ComputeCities update: %v\n", updresult.Error)
+			}
+			city2update = make([]map[string]interface{}, 0, batchSize)
+		}
+		//cityinfos = append(cityinfos, CityInfo{Code: code, AvgPriceSQM: avg_price_psqm})
 		fmt.Printf("%v: %v\n", code, avg_price_psqm)
 	}
 
-	for _, info := range cityinfos {
+	if len(city2update) > 0 {
+		updresult := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "code"}},
+			DoUpdates: clause.AssignmentColumns([]string{"avg_price"}),
+		}).Table("cities").Create(&city2update)
 
-		updresult := db.Model(City{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
 		if updresult.Error != nil {
 			fmt.Printf("Error ComputeCities update: %v\n", updresult.Error)
 		}
 	}
+
+	/*
+		for _, info := range cityinfos {
+
+			updresult := db.Model(City{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
+			if updresult.Error != nil {
+				fmt.Printf("Error ComputeCities update: %v\n", updresult.Error)
+			}
+		}
+	*/
 }
 
 func ComputeStat(dsn string) {
