@@ -162,7 +162,7 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 	whereClause := fmt.Sprintf("lat < %v AND lat > %v AND long < %v AND long > %v", NElat, SWlat, NELong, SWLong)
 
 	if dep != "" {
-		whereClause = fmt.Sprintf("%v AND department_code = %v", whereClause, dep)
+		whereClause = fmt.Sprintf("%v AND department_code = '%v'", whereClause, dep)
 	}
 
 	if after != "" {
