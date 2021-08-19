@@ -22,7 +22,7 @@ export const MapViewer = () => {
         <div id="map" style={style}>
             <MapContainer center={position}
                 zoom={10}
-
+                maxZoom={22}
                 scrollWheelZoom={true}
                 style={style}>
 
@@ -34,13 +34,13 @@ export const MapViewer = () => {
                         />
                     </LayersControl.BaseLayer>
                     <LayersControl.BaseLayer name="Satellite">
-                        <TileLayer
+                        <TileLayer maxZoom={22}
                             attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
                             url={mbbaseurl + "ckri48goh6zmf18q98pzmp1q4/tiles/{z}/{x}/{y}?access_token=" + mbtoken}
                         />
                     </LayersControl.BaseLayer>
                     <LayersControl.BaseLayer name="Light">
-                        <TileLayer
+                        <TileLayer 
                             url={'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=' + mbtoken}
                             id='mapbox/light-v9'
                             attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'

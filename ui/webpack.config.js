@@ -45,12 +45,15 @@ module.exports = {
     },
   },
   devServer: {
-    contentBase: path.join(__dirname, "frontend/"),
+    
     historyApiFallback: {
       index: '/immotep/index.html'
     },
     port: 3000,
-    publicPath: "http://localhost:3000/immotep",
+    static: {
+      directory: path.join(__dirname, "frontend/"),
+      publicPath: "http://localhost:3000/immotep",
+    },
     hot: true,
     proxy: {
       '/api': 'http://localhost:8081/'
