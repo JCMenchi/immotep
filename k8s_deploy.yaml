@@ -26,15 +26,37 @@ spec:
           env:
             - name: IMMOTEP_SERVE_PORT
               value: "8081"
+            - name: IMMOTEP_DSN_TYPE
+              value: "pgsql"
+            - name: IMMOTEP_DSN_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: dbhost
+            - name: IMMOTEP_DSN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: username
+            - name: IMMOTEP_DSN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: password
+            - name: IMMOTEP_DSN_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: database
           resources:
             requests:
+              cpu: 1000m
+              memory: 1000M
+              ephemeral-storage: "500M"
+            limits:
               cpu: 1500m
               memory: 1500M
               ephemeral-storage: "1Gi"
-            limits:
-              cpu: 2500m
-              memory: 2500M
-              ephemeral-storage: "2Gi"
       imagePullSecrets:
         - name: ociregistry
 ---

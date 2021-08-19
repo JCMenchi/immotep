@@ -23,7 +23,7 @@ USER immotep
 WORKDIR /app
 
 COPY --from=builder /src/immotepsrv ./
-COPY ./srv/imm.db ./
+#COPY ./srv/imm.db ./
 
 EXPOSE 8080
 
