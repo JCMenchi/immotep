@@ -128,6 +128,9 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 
 	db := model.ConnectToDB(dsn)
 
+	// get all records
+	records, err := reader.ReadAll()
+
 	// init counter
 	nbData := 0
 	nbHouse := 0
@@ -139,14 +142,9 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 	batchSize := 500
 	transBatch := make([]*model.Transaction, 0, batchSize)
 
-	bar := pb.Default.Start(500)
+	bar := pb.Default.Start(len(records))
 
-	for {
-		row, err := reader.Read()
-		// Stop at EOF.
-		if err == io.EOF {
-			break
-		}
+	for _, row := range records {
 		nbData++
 		bar.Increment()
 
@@ -164,7 +162,7 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 							log.Errorf("Error: %v\n", result.Error)
 						}
 						transBatch = make([]*model.Transaction, 0, batchSize)
-						log.Infof("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
+						//log.Infof("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
 					}
 				} else {
 					nbHouseWithError++
@@ -186,12 +184,12 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 		if result.Error != nil {
 			log.Errorf("Error: %v\n", result.Error)
 		}
-		log.Infof("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
+		//log.Infof("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
 	}
 
 	bar.Add(int(bar.Total() - bar.Current()))
 	bar.Finish()
-	log.Infof("File total rows: %v, data: %v, data with error: %v, duplicate: %v\n\n", nbData, nbHouse, nbHouseWithError, nbDuplicate)
+	log.Infof("File total rows: %v, data: %v, data with error: %v, duplicate: %v\n", nbData, nbHouse, nbHouseWithError, nbDuplicate)
 
 	/*fmt.Printf("Errors:")
 	for i, d := range badData {
@@ -355,12 +353,10 @@ Feature property
 func LoadRegion(dsn string, filename string) error {
 	// check if region already loaded
 	db := model.ConnectToDB(dsn)
-	var region model.Region
-	result := db.First(&region)
-	if result.Error != nil {
-		log.Errorf("LoadRegion Error: %v\n", result.Error)
-	}
-	if result.RowsAffected > 0 {
+
+	var count int64
+	db.Table("regions").Count(&count)
+	if count > 0 {
 		log.Infof("LoadRegion: region already loaded.\n")
 		return nil
 	}
@@ -373,7 +369,7 @@ func LoadRegion(dsn string, filename string) error {
 		return err
 	}
 	defer jsonFile.Close()
-	log.Infof("Load region from: %v\n", filename)
+	log.Infof("Load region from: %v...\n", filename)
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 
@@ -407,11 +403,13 @@ func LoadRegion(dsn string, filename string) error {
 		regions = append(regions, r)
 	}
 
-	result = db.Create(&regions)
+	result := db.Create(&regions)
 
 	if result.Error != nil {
 		log.Errorf("LoadRegion Error: %v\n", result.Error)
 	}
+
+	log.Infof("...region loaded.\n")
 
 	return nil
 }
@@ -441,12 +439,9 @@ func LoadRegion(dsn string, filename string) error {
 func LoadDepartment(dsn string, filename string) error {
 	// check if department already loaded
 	db := model.ConnectToDB(dsn)
-	var dep model.Department
-	result := db.First(&dep)
-	if result.Error != nil {
-		log.Errorf("LoadDepartment Error: %v\n", result.Error)
-	}
-	if result.RowsAffected > 0 {
+	var count int64
+	db.Table("departments").Count(&count)
+	if count > 0 {
 		log.Infof("LoadDepartment: department already loaded.\n")
 		return nil
 	}
@@ -459,7 +454,7 @@ func LoadDepartment(dsn string, filename string) error {
 		return err
 	}
 	defer jsonFile.Close()
-	log.Infof("Load department from: %v\n", filename)
+	log.Infof("Load department from: %v...\n", filename)
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 
@@ -502,10 +497,12 @@ func LoadDepartment(dsn string, filename string) error {
 		}
 	}
 
-	result = db.CreateInBatches(&departments, 10)
+	result := db.CreateInBatches(&departments, 10)
 	if result.Error != nil {
 		log.Errorf("Error: %v\n", result.Error)
 	}
+
+	log.Infof("...department loaded.\n")
 
 	return nil
 }
@@ -513,12 +510,9 @@ func LoadDepartment(dsn string, filename string) error {
 func LoadCity(dsn string, filename string) error {
 	// check if city already loaded
 	db := model.ConnectToDB(dsn)
-	var city model.City
-	result := db.First(&city)
-	if result.Error != nil {
-		log.Errorf("LoadCity Error: %v\n", result.Error)
-	}
-	if result.RowsAffected > 0 {
+	var count int64
+	db.Table("cities").Count(&count)
+	if count > 0 {
 		log.Infof("LoadCity: city already loaded.\n")
 		return nil
 	}
@@ -531,7 +525,7 @@ func LoadCity(dsn string, filename string) error {
 		return err
 	}
 	defer jsonFile.Close()
-	log.Infof("Load city from: %v\n", filename)
+	log.Infof("Load city from: %v...\n", filename)
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 
@@ -544,9 +538,12 @@ func LoadCity(dsn string, filename string) error {
 	}
 
 	total := len(cities)
+	bar := pb.Default.Start(total)
+
 	batchSize := 200
 	cityBatch := make([]model.City, 0, batchSize)
-	for idx, city := range cities {
+	for _, city := range cities {
+		bar.Increment()
 		if len(city.CodesPostaux) > 0 {
 			city.ZipCode, _ = strconv.Atoi(city.CodesPostaux[0])
 		}
@@ -556,7 +553,6 @@ func LoadCity(dsn string, filename string) error {
 		} else {
 			cityBatch = append(cityBatch, city)
 			if len(cityBatch) == batchSize {
-				log.Infof("[%v] Flush %v/%v cities\n", time.Now().Format("15:04:05"), idx+1, total)
 				result := db.Create(&cityBatch)
 				if result.Error != nil {
 					log.Errorf("Error: %v\n", result.Error)
@@ -566,10 +562,15 @@ func LoadCity(dsn string, filename string) error {
 		}
 	}
 
-	result = db.CreateInBatches(&cityBatch, 50)
-	if result.Error != nil {
-		log.Errorf("Error: %v\n", result.Error)
+	if len(cityBatch) > 0 {
+		result := db.CreateInBatches(&cityBatch, 50)
+		if result.Error != nil {
+			log.Errorf("Error: %v\n", result.Error)
+		}
 	}
+
+	bar.Finish()
+	log.Infof("...city loaded.\n")
 
 	return nil
 }

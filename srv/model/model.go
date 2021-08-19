@@ -86,7 +86,7 @@ func ConnectToDB(dsn string) *gorm.DB {
 	} else if strings.HasPrefix(dsn, "file:") {
 		sl := sqlite.Open(dsn)
 		db, err := gorm.Open(sl,
-			&gorm.Config{CreateBatchSize: 100000, SkipDefaultTransaction: true, Logger: logger.Default.LogMode(logger.Warn)})
+			&gorm.Config{CreateBatchSize: 100000, SkipDefaultTransaction: true, Logger: logger.Default.LogMode(logger.Error)})
 
 		if err != nil {
 			log.Errorf("ConnectToDB error: %v\n", err)

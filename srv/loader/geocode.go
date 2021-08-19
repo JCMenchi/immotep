@@ -91,14 +91,18 @@ func GeocodeDB(dsn string, depcode string) {
 	query.Table("transactions").Count(&count)
 	nbprocessed := 0
 
+	if count <= 0 {
+		log.Infof("No transactions to geocode.\n")
+		return
+	}
+
 	bar := pb.Default.Start(int(2 * count))
 
 	// batch size 5000
 	batchSize := 5000
+	nbError := 0
 	var trans []model.Transaction
 	result := query.FindInBatches(&trans, batchSize, func(tx *gorm.DB, batch int) error {
-
-		nbError := 0
 
 		// create CSV data in memory
 		b := new(strings.Builder)
@@ -180,6 +184,7 @@ func GeocodeDB(dsn string, depcode string) {
 
 	bar.Add(int(bar.Total() - bar.Current()))
 	bar.Finish()
+	log.Infof("GeocodeDB: %v elt %v processed %v err.\n", count, nbprocessed, nbError)
 }
 
 var baseURL string = "https://api-adresse.data.gouv.fr/search/csv"

@@ -32,6 +32,11 @@ func ComputeRegions(db *gorm.DB) {
 		log.Debugf("Region avg psqm %v: %.0f€\n", name, avg_price_psqm)
 	}
 
+	if len(reginfos) <= 0 {
+		log.Infof("Nothing to compute for regions.\n")
+		return
+	}
+
 	for _, info := range reginfos {
 
 		updresult := db.Model(Region{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
@@ -64,6 +69,11 @@ func ComputeDepartments(db *gorm.DB) {
 		rows.Scan(&code, &avg_price_psqm)
 		depinfos = append(depinfos, DepartmentInfo{Code: code, AvgPriceSQM: avg_price_psqm})
 		log.Debugf("Department avg psqm %v: %.0f€\n", code, avg_price_psqm)
+	}
+
+	if len(depinfos) <= 0 {
+		log.Infof("Nothing to compute for departments.\n")
+		return
 	}
 
 	for _, info := range depinfos {
@@ -102,6 +112,10 @@ func ComputeCities(db *gorm.DB) {
 		log.Debugf("City %v (%v) avg psqm: %.0f€\n", name, code, avg_price_psqm)
 	}
 
+	if len(city2update) <= 0 {
+		log.Infof("Nothing to compute for cities.\n")
+		return
+	}
 	bar := pb.Default.Start(len(city2update))
 
 	for {
