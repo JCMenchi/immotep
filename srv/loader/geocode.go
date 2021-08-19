@@ -3,7 +3,6 @@ package loader
 import (
 	"bytes"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,8 +10,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/cheggaaa/pb/v3"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"jc.org/immotep/model"
@@ -75,54 +76,6 @@ type GeoCodeInfo struct {
 	Features    []GeoFeature `json:"features"`
 }
 
-var baseURL string = "https://api-adresse.data.gouv.fr/search/?q="
-
-func GetLatLong(item *model.Transaction) *model.Transaction {
-
-	city := strings.Join(strings.Fields(item.City), "-")
-	city = strings.ReplaceAll(city, "-", "_")
-
-	addr := strings.Join(strings.Fields(item.Address), "+")
-	addr = addr + "+" + city
-
-	response, err := http.Get(baseURL + addr)
-	if err != nil {
-		fmt.Printf("GetLatLong error in HTTP GET: %v\n", err)
-		return nil
-	}
-	defer response.Body.Close()
-
-	responseData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		fmt.Printf("GetLatLong error reading body: %v\n", err)
-		return nil
-	}
-
-	var info GeoCodeInfo
-	err = json.Unmarshal(responseData, &info)
-	if err != nil {
-		fmt.Printf("GetLatLong unmarshalling error: %v\n %v\n", err, string(responseData))
-		return nil
-	}
-
-	if len(info.Features) == 0 {
-		fmt.Printf("GetLatLong no feature: %v\n", info)
-		// FIXME: mark with 0
-		item.Long = 0.0
-		item.Lat = 0.0
-		return item
-	}
-
-	geom := info.Features[0].Geometry
-
-	fmt.Printf("Geometry (%v) %v %v\n", geom, item.Address, item.City)
-
-	item.Long = geom.Coordinates[0]
-	item.Lat = geom.Coordinates[1]
-
-	return item
-}
-
 func GeocodeDB(dsn string, depcode string) {
 
 	db := model.ConnectToDB(dsn)
@@ -138,7 +91,9 @@ func GeocodeDB(dsn string, depcode string) {
 	query.Table("transactions").Count(&count)
 	nbprocessed := 0
 
-	// batch size 2000
+	bar := pb.Default.Start(int(2 * count))
+
+	// batch size 5000
 	batchSize := 5000
 	var trans []model.Transaction
 	result := query.FindInBatches(&trans, batchSize, func(tx *gorm.DB, batch int) error {
@@ -150,7 +105,12 @@ func GeocodeDB(dsn string, depcode string) {
 		b.WriteString("trid,Address,ZipCode,City\n")
 
 		for _, item := range trans {
-			b.WriteString(fmt.Sprintf("%v,%v,%v,%v\n", item.TrId, item.Address, item.ZipCode, item.City))
+			bar.Increment()
+			if item.TrId != 0 {
+				b.WriteString(fmt.Sprintf("%v,%v,%v,%v\n", item.TrId, item.Address, item.ZipCode, item.City))
+			} else {
+				log.Debugf("Bad item: %v\n", item)
+			}
 		}
 
 		// fetch data
@@ -174,51 +134,55 @@ func GeocodeDB(dsn string, depcode string) {
 			if err == io.EOF {
 				break
 			}
-
-			if len(row) > 6 {
+			bar.Increment()
+			if len(row) > 6 && row[0] != "" {
 
 				trid, _ := strconv.Atoi(row[0])
 
-				lat, err := strconv.ParseFloat(row[4], 64)
-				if err != nil {
-					fmt.Printf("GeocodeDB No lat: (%v)  %v\n", row[4], row)
+				lat, errlat := strconv.ParseFloat(row[4], 64)
+				long, errlong := strconv.ParseFloat(row[5], 64)
+
+				if errlat != nil || errlong != nil {
+					log.Debugf("GeocodeDB No coord: (%v, %v)  %v\n", row[4], row[5], row)
 					nbError++
+				} else {
+					tr2update = append(tr2update, map[string]interface{}{"tr_id": trid, "lat": lat, "long": long})
 				}
-				long, err := strconv.ParseFloat(row[5], 64)
-				if err != nil {
-					fmt.Printf("GeocodeDB No long: (%v)  %v\n", row[5], row)
-				}
-
-				tr2update = append(tr2update, map[string]interface{}{"tr_id": trid, "lat": lat, "long": long})
-
 			} else {
-				fmt.Printf("Cannot geocode: %v\n", row)
+				log.Debugf("Cannot geocode: %v\n", row)
 				nbError++
 			}
 		}
 
-		// bulk update
-		updresult := db.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "tr_id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"lat", "long"}),
-		}).Table("transactions").Create(&tr2update)
+		if len(tr2update) > 0 {
+			// bulk update
+			updresult := db.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "tr_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"lat", "long"}),
+			}).Table("transactions").Create(&tr2update)
 
-		if updresult.Error != nil {
-			fmt.Printf("Error GeocodeDB update: %v\n", updresult.Error)
-			nbError++
-		} else {
-			nbprocessed += int(updresult.RowsAffected)
+			if updresult.Error != nil {
+				log.Errorf("Error GeocodeDB update: %v\n", updresult.Error)
+				nbError++
+			} else {
+				nbprocessed += int(updresult.RowsAffected)
+			}
 		}
 
-		fmt.Printf("[%v] GeocodeDB processed batch %v (size %v) elt %v/%v, err: %v\n", time.Now().Format("15:04:05"), batch, len(trans), nbprocessed, count, nbError)
+		log.Debugf("GeocodeDB processed batch %v (size %v) elt %v/%v, err: %v\n", batch, len(trans), nbprocessed, count, nbError)
 		return nil
 	})
 
 	if result.Error != nil {
-		fmt.Printf("Error GeocodeDB: %v\n", result.Error)
+		log.Errorf("Error GeocodeDB: %v\n", result.Error)
 		return
 	}
+
+	bar.Add(int(bar.Total() - bar.Current()))
+	bar.Finish()
 }
+
+var baseURL string = "https://api-adresse.data.gouv.fr/search/csv"
 
 func getGPSCoord(csvdata string) (*csv.Reader, error) {
 
@@ -237,9 +201,9 @@ func getGPSCoord(csvdata string) (*csv.Reader, error) {
 	w.Close()
 
 	// send request
-	response, err := http.Post("https://api-adresse.data.gouv.fr/search/csv/", w.FormDataContentType(), request_body)
+	response, err := http.Post(baseURL, w.FormDataContentType(), request_body)
 	if err != nil {
-		fmt.Printf("getGPSCoord error in HTTP POST: %v\n", err)
+		log.Errorf("getGPSCoord error in HTTP POST: %v\n", err)
 		return nil, err
 	}
 	defer response.Body.Close()

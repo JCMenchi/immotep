@@ -6,10 +6,10 @@ import (
 	"time"
 
 	geojson "github.com/paulmach/go.geojson"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -72,13 +72,13 @@ func ConnectToDB(dsn string) *gorm.DB {
 			&gorm.Config{CreateBatchSize: 1000, Logger: logger.Default.LogMode(logger.Error)})
 
 		if err != nil {
-			fmt.Printf("ConnectToDB error: %v\n", err)
+			log.Errorf("ConnectToDB error: %v\n", err)
 			return nil
 		}
 
 		err = db.AutoMigrate(&Transaction{}, &Region{}, &Department{}, &City{})
 		if err != nil {
-			fmt.Printf("AutoMigrate DB error: %v\n", err.Error())
+			log.Errorf("AutoMigrate DB error: %v\n", err.Error())
 			return nil
 		}
 
@@ -89,7 +89,7 @@ func ConnectToDB(dsn string) *gorm.DB {
 			&gorm.Config{CreateBatchSize: 100000, SkipDefaultTransaction: true, Logger: logger.Default.LogMode(logger.Warn)})
 
 		if err != nil {
-			fmt.Printf("ConnectToDB error: %v\n", err)
+			log.Errorf("ConnectToDB error: %v\n", err)
 			return nil
 		}
 
@@ -142,7 +142,7 @@ func GetPOI(db *gorm.DB, limit, zip int, dep string, after string) []Transaction
 	result := db.Where(whereClause).Limit(limit).Find(&pois)
 
 	if result.Error != nil {
-		fmt.Printf("GetPOI err: %v\n", result.Error)
+		log.Errorf("GetPOI err: %v\n", result.Error)
 		return nil
 	}
 
@@ -178,7 +178,7 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 	result := db.Where(whereClause).Limit(limit).Find(&info.Trans)
 
 	if result.Error != nil {
-		fmt.Printf("GetPOIFromBounds err: %v\n", result.Error)
+		log.Errorf("GetPOIFromBounds err: %v\n", result.Error)
 		return nil
 	}
 
@@ -188,7 +188,7 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 		Rows()
 
 	if err != nil {
-		fmt.Printf("GetPOIFromBounds err: %v\n", err)
+		log.Errorf("GetPOIFromBounds err: %v\n", err)
 		return nil
 	}
 	defer rows.Close()
@@ -225,7 +225,7 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 	result := db.Where("code_department = ?", dep).Find(&cities)
 
 	if result.Error != nil {
-		fmt.Printf("GetRegionDetails err: %v\n", result.Error)
+		log.Errorf("GetRegionDetails err: %v\n", result.Error)
 		return nil
 	}
 
@@ -240,7 +240,7 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 
 		geom, err := geojson.UnmarshalGeometry([]byte(c.Contour))
 		if err != nil {
-			fmt.Printf("GetCityDetails UnmarshalGeometry err: %v\n", err)
+			log.Errorf("GetCityDetails UnmarshalGeometry err: %v\n", err)
 		} else {
 			info.Contour.Geometry = geom
 			info.Contour.SetProperty("avgprice", c.AvgPrice)
@@ -260,40 +260,6 @@ type RegionInfo struct {
 	Contour     *geojson.Feature `json:"contour"`
 }
 
-func ComputeRegions(db *gorm.DB) {
-	rows, err := db.Debug().Select("regions.name as name, regions.code as code, AVG(transactions.price_psqm) as avg_price_psqm").
-		Joins("LEFT JOIN departments ON departments.code = transactions.department_code").
-		Joins("LEFT JOIN regions ON regions.code = departments.code_region").
-		Table("transactions").
-		Group("regions.code").
-		Rows()
-
-	if err != nil {
-		fmt.Printf("ComputeRegions err: %v\n", err)
-		return
-	}
-	defer rows.Close()
-
-	var reginfos []RegionInfo = make([]RegionInfo, 0, 100)
-
-	for rows.Next() {
-		var code, name string
-		var avg_price_psqm float64
-
-		rows.Scan(&name, &code, &avg_price_psqm)
-		reginfos = append(reginfos, RegionInfo{Code: code, AvgPriceSQM: avg_price_psqm})
-		fmt.Printf("%v: %v\n", name, avg_price_psqm)
-	}
-
-	for _, info := range reginfos {
-
-		updresult := db.Model(Region{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
-		if updresult.Error != nil {
-			fmt.Printf("Error ComputeRegions update: %v\n", updresult.Error)
-		}
-	}
-}
-
 func GetRegionDetails(db *gorm.DB) []RegionInfo {
 
 	var regs []Region
@@ -301,7 +267,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 	result := db.Find(&regs)
 
 	if result.Error != nil {
-		fmt.Printf("GetRegionDetails err: %v\n", result.Error)
+		log.Errorf("GetRegionDetails err: %v\n", result.Error)
 		return nil
 	}
 
@@ -315,7 +281,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 
 		feat, err := geojson.UnmarshalFeature([]byte(r.Contour))
 		if err != nil {
-			fmt.Printf("GetRegionDetails err: %v\n", err)
+			log.Errorf("GetRegionDetails err: %v\n", err)
 		} else {
 			rinfo.Contour = feat
 			rinfo.Contour.SetProperty("avgprice", rinfo.AvgPriceSQM)
@@ -335,40 +301,6 @@ type DepartmentInfo struct {
 	Contour     *geojson.Feature `json:"contour"`
 }
 
-func ComputeDepartments(db *gorm.DB) {
-
-	rows, err := db.Debug().Select("departments.code as code, AVG(transactions.price_psqm) as avg_price_psqm").
-		Joins("LEFT JOIN departments ON departments.code = transactions.department_code").
-		Table("transactions").
-		Group("departments.code").
-		Rows()
-
-	if err != nil {
-		fmt.Printf("ComputeDepartments err: %v\n", err)
-		return
-	}
-	defer rows.Close()
-
-	var depinfos []DepartmentInfo = make([]DepartmentInfo, 0, 100)
-
-	for rows.Next() {
-		var code string
-		var avg_price_psqm float64
-
-		rows.Scan(&code, &avg_price_psqm)
-		depinfos = append(depinfos, DepartmentInfo{Code: code, AvgPriceSQM: avg_price_psqm})
-		fmt.Printf("%v: %v\n", code, avg_price_psqm)
-	}
-
-	for _, info := range depinfos {
-
-		updresult := db.Model(Department{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
-		if updresult.Error != nil {
-			fmt.Printf("Error ComputeDepartments update: %v\n", updresult.Error)
-		}
-	}
-}
-
 func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 
 	var deps []Department
@@ -376,7 +308,7 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 	result := db.Find(&deps)
 
 	if result.Error != nil {
-		fmt.Printf("GetDepartmentDetails err: %v\n", result.Error)
+		log.Errorf("GetDepartmentDetails err: %v\n", result.Error)
 		return nil
 	}
 
@@ -390,7 +322,7 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 
 		feat, err := geojson.UnmarshalFeature([]byte(d.Contour))
 		if err != nil {
-			fmt.Printf("GetDepartmentDetails err: %v\n", err)
+			log.Errorf("GetDepartmentDetails err: %v\n", err)
 		} else {
 			dinfo.Contour = feat
 			dinfo.Contour.SetProperty("avgprice", dinfo.AvgPriceSQM)
@@ -401,73 +333,4 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 	}
 
 	return depinfos
-}
-
-func ComputeCities(db *gorm.DB) {
-
-	rows, err := db.Debug().Select("transactions.city_code as code, AVG(transactions.price_psqm) as avg_price_psqm").
-		Table("transactions").
-		Group("city_code").
-		Rows()
-
-	if err != nil {
-		fmt.Printf("ComputeCities err: %v\n", err)
-		return
-	}
-	defer rows.Close()
-
-	//var cityinfos []CityInfo = make([]CityInfo, 0, 100)
-
-	batchSize := 1000
-	var city2update = make([]map[string]interface{}, 0, batchSize)
-
-	for rows.Next() {
-		var code string
-		var avg_price_psqm float64
-
-		rows.Scan(&code, &avg_price_psqm)
-
-		city2update = append(city2update, map[string]interface{}{"code": code, "avg_price": avg_price_psqm})
-		if len(city2update) == batchSize {
-			updresult := db.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "code"}},
-				DoUpdates: clause.AssignmentColumns([]string{"avg_price"}),
-			}).Table("cities").Create(&city2update)
-
-			if updresult.Error != nil {
-				fmt.Printf("Error ComputeCities update: %v\n", updresult.Error)
-			}
-			city2update = make([]map[string]interface{}, 0, batchSize)
-		}
-		//cityinfos = append(cityinfos, CityInfo{Code: code, AvgPriceSQM: avg_price_psqm})
-		fmt.Printf("%v: %v\n", code, avg_price_psqm)
-	}
-
-	if len(city2update) > 0 {
-		updresult := db.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "code"}},
-			DoUpdates: clause.AssignmentColumns([]string{"avg_price"}),
-		}).Table("cities").Create(&city2update)
-
-		if updresult.Error != nil {
-			fmt.Printf("Error ComputeCities update: %v\n", updresult.Error)
-		}
-	}
-
-	/*
-		for _, info := range cityinfos {
-
-			updresult := db.Model(City{}).Where("code = ?", info.Code).Updates(map[string]interface{}{"avg_price": info.AvgPriceSQM})
-			if updresult.Error != nil {
-				fmt.Printf("Error ComputeCities update: %v\n", updresult.Error)
-			}
-		}
-	*/
-}
-
-func ComputeStat(dsn string) {
-	db := ConnectToDB(dsn)
-	ComputeRegions(db)
-	ComputeDepartments(db)
-	ComputeCities(db)
 }

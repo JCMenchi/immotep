@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -11,12 +10,15 @@ import (
 	"jc.org/immotep/model"
 
 	homedir "github.com/mitchellh/go-homedir"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 // package variable
 // name of viper config file set as command line arg
 var cfgFile string
+
+var debugMode bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -37,10 +39,13 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// define flags comon to all commands
+	// define flags common to all commands
 
 	// define viper config file
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.immotep.yaml)")
+
+	// debug
+	rootCmd.PersistentFlags().BoolVar(&debugMode, "debug", false, "activate debug logs")
 
 	// define Database connection string
 	rootCmd.PersistentFlags().StringP("dsn-type", "t", "pgsql", "immotep Database type one of pgsql or sqlite (default pgsql)")
@@ -113,9 +118,12 @@ func initConfig() {
 	viper.SetEnvKeyReplacer(replacer)
 	viper.AutomaticEnv() // read in environment variables that match
 
+	if debugMode {
+		log.SetLevel(log.DebugLevel)
+	}
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		log.Infof("Using config file: %v\n", viper.ConfigFileUsed())
 	}
 }
 
@@ -155,9 +163,9 @@ var loadCmd = &cobra.Command{
 
 		// load data
 		dsn := getDSN()
-		fmt.Printf("load data to db: %v\n", dsn)
+		log.Infof("load data to db: %v\n", dsn)
 		for i, a := range args {
-			fmt.Printf("load data file(%v): %v\n", i, a)
+			log.Infof("load data file(%v): %v\n", i, a)
 			loader.LoadRawData(getDSN(), a, zipcodeMap)
 		}
 	},
@@ -174,7 +182,7 @@ var loadConfCmd = &cobra.Command{
 		city := viper.GetString("file.city")
 		// load data
 		dsn := getDSN()
-		fmt.Printf("load conf to db: %v\n", dsn)
+		log.Infof("load conf to db: %v\n", dsn)
 
 		if region != "" {
 			loader.LoadRegion(dsn, region)
@@ -195,10 +203,10 @@ var geocodeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// geo code address
 		dsn := getDSN()
-		fmt.Printf("geocode db: %v\n", dsn)
+		log.Infof("geocode db: %v\n", dsn)
 		if len(args) > 0 {
 			for _, a := range args {
-				fmt.Printf("geocode dep: %v\n", a)
+				log.Infof("geocode dep: %v\n", a)
 				loader.GeocodeDB(dsn, a)
 			}
 		} else {
@@ -214,7 +222,7 @@ var computeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// geo code address
 		dsn := getDSN()
-		fmt.Printf("compute db: %v\n", dsn)
+		log.Infof("compute db: %v\n", dsn)
 		model.ComputeStat(dsn)
 	},
 }
@@ -229,8 +237,8 @@ var serveCmd = &cobra.Command{
 		port := viper.GetInt("serve.port")
 		staticDir := viper.GetString("serve.static")
 
-		fmt.Printf("load conf to db: %v\n", dsn)
+		log.Infof("load conf to db: %v\n", dsn)
 
-		api.Serve(dsn, staticDir, port)
+		api.Serve(dsn, staticDir, port, debugMode)
 	},
 }

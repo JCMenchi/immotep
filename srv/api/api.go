@@ -4,10 +4,10 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"jc.org/immotep/model"
 )
@@ -20,13 +20,20 @@ var immotepDSN string
 var staticFS embed.FS
 
 // Start HTTP server
-func Serve(dsn string, staticDir string, port int) {
-	router := BuildRouter(dsn, staticDir)
+func Serve(dsn string, staticDir string, port int, debug bool) {
+	router := BuildRouter(dsn, staticDir, debug)
 
 	router.Run(fmt.Sprintf(":%v", port)) // listen and serve on 0.0.0.0:${port}
 }
 
-func BuildRouter(dsn, staticDir string) *gin.Engine {
+func BuildRouter(dsn, staticDir string, debug bool) *gin.Engine {
+
+	if debug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	engine := gin.New()
 	engine.Use(gin.Logger())
 	engine.Use(gin.Recovery())
@@ -43,11 +50,11 @@ func BuildRouter(dsn, staticDir string) *gin.Engine {
 	})
 
 	if staticDir == "" {
-		fmt.Printf("Serve static data internally.\n")
+		log.Infof("Serve static data internally.\n")
 		s, _ := fs.Sub(staticFS, "immotep")
 		engine.StaticFS("/immotep", http.FS(s))
 	} else {
-		fmt.Printf("Serve static data from: %v\n", staticDir)
+		log.Infof("Serve static data from: %v\n", staticDir)
 		engine.Static("/immotep", staticDir)
 	}
 
@@ -172,7 +179,7 @@ func addRoutes(rg *gin.RouterGroup) {
 			}
 		}
 
-		fmt.Printf("Get city info for dep %v\n", dep)
+		log.Debugf("Get city info for dep %v\n", dep)
 
 		infos := model.GetCityDetails(immotepDB, dep)
 

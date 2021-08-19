@@ -12,7 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cheggaaa/pb/v3"
 	geojson "github.com/paulmach/go.geojson"
+	log "github.com/sirupsen/logrus"
 	"jc.org/immotep/model"
 )
 
@@ -76,7 +78,7 @@ func ReadZipcodeMap(filename string) map[string]int {
 	// skip header
 	_, err = reader.Read()
 	if err != nil {
-		fmt.Printf("ReadZipcodeMap cannot read Header: %v\n", err)
+		log.Errorf("ReadZipcodeMap cannot read Header: %v\n", err)
 		return zipCodeMap
 	}
 
@@ -107,7 +109,7 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 	// open CSV file
 	f, err := os.Open(filename)
 	if err != nil {
-		fmt.Printf("LoadRawData error: %v\n", err)
+		log.Errorf("LoadRawData error: %v\n", err)
 		return
 	}
 	defer f.Close()
@@ -120,7 +122,7 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 	// skip Header
 	_, err = reader.Read()
 	if err != nil {
-		fmt.Printf("LoadRawData cannot read Header: %v\n", err)
+		log.Errorf("LoadRawData cannot read Header: %v\n", err)
 		return
 	}
 
@@ -134,8 +136,10 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 
 	var previousRow []string
 
-	batchSize := 50000
+	batchSize := 500
 	transBatch := make([]*model.Transaction, 0, batchSize)
+
+	bar := pb.Default.Start(500)
 
 	for {
 		row, err := reader.Read()
@@ -144,6 +148,7 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 			break
 		}
 		nbData++
+		bar.Increment()
 
 		if row[TYPE_BIEN_COL] == "Maison" && row[TYPE_VENTE_COL] == "Vente" && row[PRICE_COL] != "" && row[NB_ROOM_COL] != "" {
 			ok := checkNotDuplicate(previousRow, row)
@@ -156,10 +161,10 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 					if len(transBatch) == batchSize {
 						result := db.Create(&transBatch)
 						if result.Error != nil {
-							fmt.Printf("Error: %v\n", result.Error)
+							log.Errorf("Error: %v\n", result.Error)
 						}
 						transBatch = make([]*model.Transaction, 0, batchSize)
-						fmt.Printf("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
+						log.Infof("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
 					}
 				} else {
 					nbHouseWithError++
@@ -172,20 +177,21 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 		}
 
 		if err != nil {
-			fmt.Printf("Error line %v: %v\n", nbData, row)
-			fmt.Println(err)
+			log.Errorf("Error line %v: %v %v\n", nbData, row, err)
 		}
 	}
 
 	if len(transBatch) > 0 {
 		result := db.Create(&transBatch)
 		if result.Error != nil {
-			fmt.Printf("Error: %v\n", result.Error)
+			log.Errorf("Error: %v\n", result.Error)
 		}
-		fmt.Printf("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
+		log.Infof("%v %v/%v\n", time.Now().Format("15:04:05"), nbHouse, nbData)
 	}
 
-	fmt.Printf("File total rows: %v, data: %v, data with error: %v, duplicate: %v\n\n", nbData, nbHouse, nbHouseWithError, nbDuplicate)
+	bar.Add(int(bar.Total() - bar.Current()))
+	bar.Finish()
+	log.Infof("File total rows: %v, data: %v, data with error: %v, duplicate: %v\n\n", nbData, nbHouse, nbHouseWithError, nbDuplicate)
 
 	/*fmt.Printf("Errors:")
 	for i, d := range badData {
@@ -207,7 +213,7 @@ func checkNotDuplicate(previousRow, row []string) bool {
 		previousRow[SECTION_CADASTRE_COL] == row[SECTION_CADASTRE_COL] &&
 		previousRow[CADASTRE_COL] == row[CADASTRE_COL] {
 
-		//fmt.Printf("DUPLICATE: %v\n           %v\n\n", row, previousRow)
+		log.Tracef("DUPLICATE: %v\n           %v\n\n", row, previousRow)
 		return false
 	}
 
@@ -229,7 +235,7 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 		if ok {
 			item.ZipCode = zipCodeMap[item.City]
 		} else {
-			fmt.Printf("Cannot convert ZIP_CODE %v: %v\n", row, err)
+			log.Errorf("Cannot convert ZIP_CODE %v: %v\n", row, err)
 			item.ZipCode = 0
 			hasError = true
 		}
@@ -240,7 +246,7 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 
 	i, err = strconv.Atoi(row[NB_ROOM_COL])
 	if err != nil {
-		fmt.Printf("Cannot convert NB_ROOM_COL %v: %v\n", row, err)
+		log.Errorf("Cannot convert NB_ROOM_COL %v: %v\n", row, err)
 		item.NbRoom = 0
 		//hasError = true
 	} else {
@@ -258,7 +264,7 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 	v, err := strconv.ParseFloat(strings.Replace(row[PRICE_COL], ",", ".", 1), 64)
 	if err != nil {
 		// no interested when no price
-		fmt.Printf("No price: (%v)  %v\n", row[PRICE_COL], row)
+		log.Errorf("No price: (%v)  %v\n", row[PRICE_COL], row)
 		hasError = true
 	} else {
 		item.Price = v
@@ -266,7 +272,7 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 
 	i, err = strconv.Atoi(row[HOUSE_AREA_COL])
 	if err != nil {
-		// fmt.Printf("Cannot convert HOUSE_AREA_COL %v: %v\n", row, err)
+		log.Debugf("Cannot convert HOUSE_AREA_COL %v: %v\n", row, err)
 		hasError = true
 	} else {
 		item.Area = i
@@ -275,7 +281,7 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 	if row[FULL_AREA_COL] != "" {
 		i, err = strconv.Atoi(row[FULL_AREA_COL])
 		if err != nil {
-			fmt.Printf("Cannot convert FULL_AREA_COL %v: %v\n", row, err)
+			log.Errorf("Cannot convert FULL_AREA_COL %v: %v\n", row, err)
 		} else {
 			item.FullArea = i
 		}
@@ -287,7 +293,7 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 
 	t, err := time.Parse("02/01/2006", row[DATE_COL])
 	if err != nil {
-		fmt.Printf("Cannot convert DATE_COL %v: %v\n", row, err)
+		log.Errorf("Cannot convert DATE_COL %v: %v\n", row, err)
 		hasError = true
 	}
 	item.Date = t
@@ -352,10 +358,10 @@ func LoadRegion(dsn string, filename string) error {
 	var region model.Region
 	result := db.First(&region)
 	if result.Error != nil {
-		fmt.Printf("LoadRegion Error: %v\n", result.Error)
+		log.Errorf("LoadRegion Error: %v\n", result.Error)
 	}
 	if result.RowsAffected > 0 {
-		fmt.Printf("LoadRegion: region already loaded.\n")
+		log.Infof("LoadRegion: region already loaded.\n")
 		return nil
 	}
 
@@ -363,11 +369,11 @@ func LoadRegion(dsn string, filename string) error {
 	jsonFile, err := os.Open(filename)
 
 	if err != nil {
-		fmt.Printf("LoadRegion cannot open %v: %v\n", filename, err)
+		log.Errorf("LoadRegion cannot open %v: %v\n", filename, err)
 		return err
 	}
 	defer jsonFile.Close()
-	fmt.Printf("Load region from: %v\n", filename)
+	log.Infof("Load region from: %v\n", filename)
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 
@@ -375,7 +381,7 @@ func LoadRegion(dsn string, filename string) error {
 
 	err = json.Unmarshal(byteValue, &regionsgeo)
 	if err != nil {
-		fmt.Printf("LoadRegion cannot decode JSON file %v: %v\n", filename, err)
+		log.Errorf("LoadRegion cannot decode JSON file %v: %v\n", filename, err)
 		return err
 	}
 
@@ -385,15 +391,15 @@ func LoadRegion(dsn string, filename string) error {
 		var r model.Region
 		r.Name, err = feature.PropertyString("reg_name_upper")
 		if err != nil {
-			fmt.Printf("LoadRegion cannot read property reg_name_upper: %v\n", err)
+			log.Errorf("LoadRegion cannot read property reg_name_upper: %v\n", err)
 		}
 		r.Code, err = feature.PropertyString("reg_code")
 		if err != nil {
-			fmt.Printf("LoadRegion cannot read property reg_code: %v\n", err)
+			log.Errorf("LoadRegion cannot read property reg_code: %v\n", err)
 		}
 		data, err := json.Marshal(feature)
 		if err != nil {
-			fmt.Printf("LoadRegion cannot marshall contour: %v\n", err)
+			log.Errorf("LoadRegion cannot marshall contour: %v\n", err)
 		} else {
 			r.Contour = string(data)
 		}
@@ -404,7 +410,7 @@ func LoadRegion(dsn string, filename string) error {
 	result = db.Create(&regions)
 
 	if result.Error != nil {
-		fmt.Printf("LoadRegion Error: %v\n", result.Error)
+		log.Errorf("LoadRegion Error: %v\n", result.Error)
 	}
 
 	return nil
@@ -438,10 +444,10 @@ func LoadDepartment(dsn string, filename string) error {
 	var dep model.Department
 	result := db.First(&dep)
 	if result.Error != nil {
-		fmt.Printf("LoadDepartment Error: %v\n", result.Error)
+		log.Errorf("LoadDepartment Error: %v\n", result.Error)
 	}
 	if result.RowsAffected > 0 {
-		fmt.Printf("LoadDepartment: department already loaded.\n")
+		log.Infof("LoadDepartment: department already loaded.\n")
 		return nil
 	}
 
@@ -449,18 +455,18 @@ func LoadDepartment(dsn string, filename string) error {
 	jsonFile, err := os.Open(filename)
 
 	if err != nil {
-		fmt.Printf("LoadDepartment cannot open %v: %v\n", filename, err)
+		log.Errorf("LoadDepartment cannot open %v: %v\n", filename, err)
 		return err
 	}
 	defer jsonFile.Close()
-	fmt.Printf("Load department from: %v\n", filename)
+	log.Infof("Load department from: %v\n", filename)
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 
 	var departmentsgeo geojson.FeatureCollection
 	err = json.Unmarshal(byteValue, &departmentsgeo)
 	if err != nil {
-		fmt.Printf("LoadDepartment cannot decode JSON file %v: %v\n", filename, err)
+		log.Errorf("LoadDepartment cannot decode JSON file %v: %v\n", filename, err)
 		return err
 	}
 
@@ -470,15 +476,15 @@ func LoadDepartment(dsn string, filename string) error {
 		var d model.Department
 		d.Name, err = feature.PropertyString("dep_name_upper")
 		if err != nil {
-			fmt.Printf("LoadDepartment cannot read property dep_name_upper: %v\n", err)
+			log.Errorf("LoadDepartment cannot read property dep_name_upper: %v\n", err)
 		}
 		d.Code, err = feature.PropertyString("dep_code")
 		if err != nil {
-			fmt.Printf("LoadDepartment cannot read property dep_code: %v\n", err)
+			log.Errorf("LoadDepartment cannot read property dep_code: %v\n", err)
 		}
 		d.CodeRegion, err = feature.PropertyString("reg_code")
 		if err != nil {
-			fmt.Printf("LoadDepartment cannot read property reg_code: %v\n", err)
+			log.Errorf("LoadDepartment cannot read property reg_code: %v\n", err)
 		}
 
 		regcode, err := strconv.Atoi(d.CodeRegion)
@@ -487,7 +493,7 @@ func LoadDepartment(dsn string, filename string) error {
 		if err == nil && regcode >= 11 && regcode <= 94 {
 			data, err := json.Marshal(feature)
 			if err != nil {
-				fmt.Printf("LoadDepartment cannot marshall contour: %v\n", err)
+				log.Errorf("LoadDepartment cannot marshall contour: %v\n", err)
 			} else {
 				d.Contour = string(data)
 			}
@@ -498,7 +504,7 @@ func LoadDepartment(dsn string, filename string) error {
 
 	result = db.CreateInBatches(&departments, 10)
 	if result.Error != nil {
-		fmt.Printf("Error: %v\n", result.Error)
+		log.Errorf("Error: %v\n", result.Error)
 	}
 
 	return nil
@@ -510,10 +516,10 @@ func LoadCity(dsn string, filename string) error {
 	var city model.City
 	result := db.First(&city)
 	if result.Error != nil {
-		fmt.Printf("LoadCity Error: %v\n", result.Error)
+		log.Errorf("LoadCity Error: %v\n", result.Error)
 	}
 	if result.RowsAffected > 0 {
-		fmt.Printf("LoadCity: city already loaded.\n")
+		log.Infof("LoadCity: city already loaded.\n")
 		return nil
 	}
 
@@ -521,11 +527,11 @@ func LoadCity(dsn string, filename string) error {
 	jsonFile, err := os.Open(filename)
 
 	if err != nil {
-		fmt.Printf("LoadCity cannot open %v: %v\n", filename, err)
+		log.Errorf("LoadCity cannot open %v: %v\n", filename, err)
 		return err
 	}
 	defer jsonFile.Close()
-	fmt.Printf("Load city from: %v\n", filename)
+	log.Infof("Load city from: %v\n", filename)
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 
@@ -533,7 +539,7 @@ func LoadCity(dsn string, filename string) error {
 
 	err = json.Unmarshal(byteValue, &cities)
 	if err != nil {
-		fmt.Printf("LoadCity cannot decode JSON file %v: %v\n", filename, err)
+		log.Errorf("LoadCity cannot decode JSON file %v: %v\n", filename, err)
 		return err
 	}
 
@@ -546,14 +552,14 @@ func LoadCity(dsn string, filename string) error {
 		}
 		err = GetCityContour(&city)
 		if err != nil {
-			fmt.Printf("LoadCity cannot get contour for %v: %v\n", city.Name, err)
+			log.Errorf("LoadCity cannot get contour for %v: %v\n", city.Name, err)
 		} else {
 			cityBatch = append(cityBatch, city)
 			if len(cityBatch) == batchSize {
-				fmt.Printf("[%v] Flush %v/%v cities\n", time.Now().Format("15:04:05"), idx+1, total)
+				log.Infof("[%v] Flush %v/%v cities\n", time.Now().Format("15:04:05"), idx+1, total)
 				result := db.Create(&cityBatch)
 				if result.Error != nil {
-					fmt.Printf("Error: %v\n", result.Error)
+					log.Errorf("Error: %v\n", result.Error)
 				}
 				cityBatch = make([]model.City, 0, batchSize)
 			}
@@ -562,7 +568,7 @@ func LoadCity(dsn string, filename string) error {
 
 	result = db.CreateInBatches(&cityBatch, 50)
 	if result.Error != nil {
-		fmt.Printf("Error: %v\n", result.Error)
+		log.Errorf("Error: %v\n", result.Error)
 	}
 
 	return nil
@@ -585,27 +591,27 @@ func GetCityContour(city *model.City) error {
 
 	response, err := http.Get(query)
 	if err != nil {
-		fmt.Printf("GetCityContour error in HTTP GET: %v\n", err)
+		log.Errorf("GetCityContour error in HTTP GET: %v\n", err)
 		return err
 	}
 	defer response.Body.Close()
 
 	responseData, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		fmt.Printf("GetCityContour error reading body: %v\n", err)
+		log.Errorf("GetCityContour error reading body: %v\n", err)
 		return err
 	}
 
 	var info CityInfo
 	err = json.Unmarshal(responseData, &info)
 	if err != nil {
-		fmt.Printf("GetCityContour unmarshalling error: %v\n %v\n", err, string(responseData))
+		log.Errorf("GetCityContour unmarshalling error: %v\n %v\n", err, string(responseData))
 		return err
 	}
 
 	data, err := json.Marshal(info.Contour)
 	if err != nil {
-		fmt.Printf("GetCityContour cannot marshall contour: %v\n", err)
+		log.Errorf("GetCityContour cannot marshall contour: %v\n", err)
 		return err
 	}
 	city.Contour = string(data)
