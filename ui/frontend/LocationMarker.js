@@ -7,6 +7,8 @@ import service from './poi_service'
 import {
     changeAvgPrice,
     changeAvgPriceSQM,
+    changeZoom,
+    changePosition,
     selectQueryLimit,
     selectQueryDepartment
 } from './store/uiparamSlice';
@@ -26,23 +28,27 @@ export const LocationMarker = () => {
     const [transactions, setTransactions] = useState(null)
 
     const map = useMapEvents({
+
         click(event) {
-            //map.locate()
+
             console.log('map point:', event.latlng)
             console.log('map center:', map.getCenter())
-            console.log('map bounds:', map.getBounds())
+            console.log('map bounds:', map.getBounds().getNorthEast(), map.getBounds().getSouthWest())
             console.log('map zoom:', map.getZoom())
+            dispatch(changePosition(map.getCenter()))
+
             setLastPos(event.latlng)
             setInfo(`latlong: ${event.latlng.lat}, ${event.latlng.lng}`)
         },
 
         moveend(_event) {
-            console.log('moveend map bounds:', map.getBounds())
+
             const bounds = {
                 northEast: map.getBounds()._northEast,
                 southWest: map.getBounds()._southWest,
                 code: department
             }
+            dispatch(changeZoom(map.getZoom()));
 
             // need to reload data with new bounds
             service.post("api/pois/filter?limit=" + limit, bounds)

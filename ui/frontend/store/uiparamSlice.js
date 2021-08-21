@@ -8,7 +8,8 @@ export const uiParam = createSlice({
     queryDepartment: localStorage.getItem('query_department') || "29",
     theme: localStorage.getItem('ui_theme') || "dark",
     lang: localStorage.getItem('ui_lang') || "",
-    showMark: localStorage.getItem('ui_mark') || false,
+    currentPosition: JSON.parse(localStorage.getItem('ui_center')) || [48.6007, -4.0451],
+    zoom: localStorage.getItem('ui_zoom') || 10,
     avgPrice: -1,
     avgPriceSQM: -1
   },
@@ -29,9 +30,13 @@ export const uiParam = createSlice({
       state.lang = action.payload;
       localStorage.setItem('ui_lang', state.lang);
     },
-    changeShowMark(state, action) {
-      state.showMark = action.payload;
-      localStorage.setItem('ui_mark', state.showMark);
+    changePosition(state, action) {
+      state.currentPosition = action.payload;
+      localStorage.setItem('ui_center', JSON.stringify(state.currentPosition));
+    },
+    changeZoom(state, action) {
+      state.zoom = action.payload;
+      localStorage.setItem('ui_zoom', state.zoom);
     },
     changeAvgPrice(state, action) {
       state.avgPrice = action.payload;
@@ -42,13 +47,17 @@ export const uiParam = createSlice({
   }
 });
 
-export const { changeQueryLimit, changeQueryDepartment, changeUITheme, changeUILanguage, changeShowMark, changeAvgPrice, changeAvgPriceSQM } = uiParam.actions;
+export const { changeQueryLimit, changeQueryDepartment,
+  changeUITheme, changeUILanguage,
+  changePosition, changeZoom,
+  changeAvgPrice, changeAvgPriceSQM } = uiParam.actions;
 
 // some selector
 export const selectUITheme = state => state.uiParam.theme;
 export const selectUILanguage = state => state.uiParam.lang;
+export const selectCenterPosition = state => state.uiParam.currentPosition;
+export const selectZoom = state => state.uiParam.zoom;
 export const selectQueryLimit = state => state.uiParam.queryLimit;
 export const selectQueryDepartment = state => state.uiParam.queryDepartment;
-export const selectUIShowMark = state => state.uiParam.showMark;
 export const selectAvgPrice = state => state.uiParam.avgPrice;
 export const selectAvgPriceSQM = state => state.uiParam.avgPriceSQM;

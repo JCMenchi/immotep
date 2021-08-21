@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { useTranslation } from 'react-i18next';
-import { CssBaseline, IconButton, Grid, Paper, ThemeProvider } from '@material-ui/core';
+import React from 'react';
+import { useSelector } from 'react-redux';
+import { CssBaseline, Grid, ThemeProvider } from '@material-ui/core';
 import { createTheme } from '@material-ui/core/styles';
-import { Brightness7, Brightness4 } from '@material-ui/icons';
 
-import { selectUITheme, changeUITheme } from './store/uiparamSlice';
+import { selectCenterPosition, selectZoom, selectUITheme} from './store/uiparamSlice';
 
 import { MapViewer } from './MapViewer';
 import './App.css';
@@ -32,21 +30,9 @@ const lightTheme = createTheme({
 export default function App(props) {
 
   // local state
-  const [uiTheme, setUITheme] = useState('dark');
-
-  // get reducer dispatcher
-  const dispatch = useDispatch();
+  const position = useSelector(selectCenterPosition);
+  const zoom = useSelector(selectZoom);
   const UITheme = useSelector(selectUITheme);
-
-  const toggleUITheme = () => {
-    if (uiTheme === 'dark') {
-      dispatch(changeUITheme('light'));
-      setUITheme('light');
-    } else {
-      dispatch(changeUITheme('dark'));
-      setUITheme('dark');
-    }
-  };
 
   return (
 
@@ -54,21 +40,10 @@ export default function App(props) {
       <CssBaseline />
       <Grid container direction='column' spacing={1} style={{ height: '100%' }}>
         <Grid item style={{ width: '100%' }}>
-          <Paper variant='outlined'>
-            <Grid item container direction='row' alignItems='center'>
-              <Grid item style={{ flexGrow: 1 }}>
-                <Menubar/>
-              </Grid>
-              <Grid item >
-                <IconButton size="small" onClick={() => toggleUITheme()} >
-                  {UITheme === 'dark' ? <Brightness4 /> : <Brightness7 />}
-                </IconButton>
-              </Grid>
-            </Grid>
-          </Paper>
+            <Menubar/>
         </Grid>
         <Grid item style={{ flexGrow: 1, width: '100%' }}>
-          <MapViewer />
+          <MapViewer initposition={position} initZoom={zoom} />
         </Grid>
       </Grid>
     </ThemeProvider>

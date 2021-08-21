@@ -3,7 +3,7 @@ import axios from 'axios';
 import log from 'loglevel';
 
 const LOGGER = log.getLogger("api");
-LOGGER.setDefaultLevel("debug");
+LOGGER.setDefaultLevel("info");
 
 /*==============================================================*/
 /**            Setup AXIOS instance                             */

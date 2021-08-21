@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { LayersControl, LayerGroup, MapContainer, TileLayer } from "react-leaflet";
 
 import { CityStat } from "./CityStat";
@@ -15,17 +15,28 @@ const mbbaseurl = "https://api.mapbox.com/styles/v1/jcmenchi/";
 
 const mbtoken = "pk.eyJ1IjoiamNtZW5jaGkiLCJhIjoiY2tyaTQxOXZjMGM4YTJ1cnZ0ZGM0eWdlbSJ9.Cqy-UGrsUUWAGF8mFPUiGg";
 
-export const MapViewer = () => {
-    const [position] = useState([48.6007, -4.0451]);// initial position of map
+export const MapViewer = ({ initposition, initZoom }) => {
+    // store pointer to leaflet map object
+    /** @type {import("leaflet").Map} */
+    const initMap = null
+    const [ map, setMap] = useState(initMap);
+
+    useEffect(() => {
+        if (map) {
+            console.log("fly to :", initposition )
+            map.flyTo(initposition)
+        }
+    }, [initposition]);
 
     return (
         <div id="map" style={style}>
-            <MapContainer center={position}
-                zoom={10}
+            <MapContainer center={initposition}
+                zoom={initZoom}
                 maxZoom={22}
                 scrollWheelZoom={true}
-                style={style}>
-
+                style={style}
+                whenCreated={setMap}
+            >
                 <LayersControl position="topright">
                     <LayersControl.BaseLayer checked name="Map">
                         <TileLayer
@@ -40,7 +51,7 @@ export const MapViewer = () => {
                         />
                     </LayersControl.BaseLayer>
                     <LayersControl.BaseLayer name="Light">
-                        <TileLayer 
+                        <TileLayer
                             url={'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=' + mbtoken}
                             id='mapbox/light-v9'
                             attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
@@ -61,7 +72,7 @@ export const MapViewer = () => {
                     <LayersControl.Overlay checked name="Communes Info">
                         <LayerGroup><CityStat /></LayerGroup>
                     </LayersControl.Overlay>
-                                        
+
                     <LayersControl.Overlay name="Vente">
                         <LayerGroup>
                             <LocationMarker />
