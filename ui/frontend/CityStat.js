@@ -16,7 +16,7 @@ function computeCityContourStyle(feature) {
         weight: 1,
         strokeWidth: 2,
         opacity: 1,
-        color: color,
+        color: "red",
         fillOpacity: 0.5
     };
 }

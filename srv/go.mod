@@ -3,7 +3,7 @@ module jc.org/immotep
 go 1.16
 
 require (
-	github.com/cheggaaa/pb/v3 v3.0.8 // indirect
+	github.com/cheggaaa/pb/v3 v3.0.8
 	github.com/gin-gonic/gin v1.7.2
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/paulmach/go.geojson v1.4.0
