@@ -3,4 +3,6 @@ raw/
 data/
 .vscode/
 ui/node_modules/
+ui/immotep/
+ui/package-lock.json
 ./*.db
