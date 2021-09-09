@@ -2,7 +2,7 @@ import React, { Suspense } from "react";
 import ReactDOM from "react-dom";
 import { Provider } from 'react-redux';
 
-import 'fontsource-roboto';
+import '@fontsource/roboto';
 
 // import i18n (needs to be bundled ;)) 
 import './i18n';
