@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -103,10 +104,39 @@ func ReadZipcodeMap(filename string) map[string]int {
 	return zipCodeMap
 }
 
+func lineCounter(filename string) (int, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		log.Errorf("lineCounter error: %v\n", err)
+		return -1, err
+	}
+	defer f.Close()
+
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+
+	for {
+		c, err := f.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+
+		switch {
+		case err == io.EOF:
+			return count, nil
+
+		case err != nil:
+			return count, err
+		}
+	}
+}
+
 var badData [][]string = make([][]string, 0, 10)
 
 func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 	// open CSV file
+
+	nbline, err := lineCounter(filename)
+
 	f, err := os.Open(filename)
 	if err != nil {
 		log.Errorf("LoadRawData error: %v\n", err)
@@ -128,11 +158,8 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 
 	db := model.ConnectToDB(dsn)
 
-	// get all records
-	records, err := reader.ReadAll()
-
 	// init counter
-	nbData := 0
+	var nbData int64 = 0
 	nbHouse := 0
 	nbHouseWithError := 0
 	nbDuplicate := 0
@@ -142,10 +169,17 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 	batchSize := 500
 	transBatch := make([]*model.Transaction, 0, batchSize)
 
-	bar := pb.Default.Start(len(records))
+	bar := pb.Default.Start(nbline)
 
-	for _, row := range records {
+	for {
+		row, err := reader.Read()
+		// Stop at EOF.
+		if err == io.EOF {
+			break
+		}
+
 		nbData++
+
 		bar.Increment()
 
 		if row[TYPE_BIEN_COL] == "Maison" && row[TYPE_VENTE_COL] == "Vente" && row[PRICE_COL] != "" && row[NB_ROOM_COL] != "" {
