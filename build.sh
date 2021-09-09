@@ -72,7 +72,7 @@ if [ "${DOCKER_REGISTRY}X" != "X" ]; then
     echo "Deploy to registry: ${DOCKER_REGISTRY}"
     docker tag immotep:"${VERSION}" "${DOCKER_REGISTRY}"immotep:"${VERSION}"
     docker push "${DOCKER_REGISTRY}"immotep:"${VERSION}"
-fi
 
-echo "================ K8S ========================="
-kubectl apply -f k8s_deploy.yaml
+    echo "================ K8S ========================="
+    kubectl apply -f k8s_deploy.yaml
+fi

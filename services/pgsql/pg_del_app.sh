@@ -7,17 +7,25 @@ PGPORT=${PGPORT:-5432}
 PG_ADMIN_USER=${PG_ADMIN_USER:-pgr}
 PG_ADMIN_PASSWORD=${PG_ADMIN_PASSWORD:-pgr}
 
+export USE_K8S=0
+
 show_help () {
     echo "Usage: $0 [-h] dbname"
     echo "  Delete Database"
 }
 # Decode args
 OPTIND=1  # Reset in case getopts has been used previously in the shell.
-while getopts ":h?" opt; do
+while getopts ":h?ku:" opt; do
     case "$opt" in
     h|\?)
         show_help
         exit 0
+        ;;
+    u)
+        export APP_USER=${OPTARG}
+        ;;
+    k)
+        export USE_K8S=1
         ;;
     esac
 done
@@ -31,16 +39,21 @@ fi
 
 APP=$1
 
-# check if secret 
-n=$(kubectl get secrets | grep -q "${APP}"-pgsql; echo $?)
-if [ "$n" == 1 ]; then
-    echo "Cannot find secret ${APP}-pgsql"
-    exit 2
-fi
+APP_DB=${APP}db
 
-# get value from secret
-APP_DB=$(kubectl get secret "${APP}"-pgsql -o yaml | grep " database:" | cut -d: -f2 | cut -d\  -f2 | base64 -d)
-APP_USER=$(kubectl get secret "${APP}"-pgsql -o yaml | grep " username:" | cut -d: -f2 | cut -d\  -f2 | base64 -d)
+
+if [ $USE_K8S == 1 ]; then
+    # check if secret 
+    n=$(kubectl get secrets | grep -q "${APP}"-pgsql; echo $?)
+    if [ "$n" == 1 ]; then
+        echo "Cannot find secret ${APP}-pgsql"
+        exit 2
+    fi
+
+    # get value from secret
+    APP_DB=$(kubectl get secret "${APP}"-pgsql -o yaml | grep " database:" | cut -d: -f2 | cut -d\  -f2 | base64 -d)
+    APP_USER=$(kubectl get secret "${APP}"-pgsql -o yaml | grep " username:" | cut -d: -f2 | cut -d\  -f2 | base64 -d)
+fi
 
 # check if database exists
 n=$(PGPASSWORD=${PG_ADMIN_PASSWORD} psql -U "${PG_ADMIN_USER}" -h"${PGHOST}" -p"${PGPORT}" -dpostgres -c'\l' | grep -c "${APP_DB}" )
@@ -60,8 +73,10 @@ else
 	PGPASSWORD=${PG_ADMIN_PASSWORD} ${PG_HOME}/bin/psql -U "${PG_ADMIN_USER}" -h"${PGHOST}" -p"${PGPORT}" -dpostgres -c "DROP USER ${APP_USER};"
 fi
 
-# delete secret
-kubectl delete secrets "${APP}"-pgsql
+if [ $USE_K8S == 1 ]; then
+    # delete secret
+    kubectl delete secrets "${APP}"-pgsql
+fi
 
 # show users
 PGPASSWORD=${PG_ADMIN_PASSWORD} "${PG_HOME}"/bin/psql -U "${PG_ADMIN_USER}" -h"${PGHOST}"  -p"${PGPORT}" -dpostgres -c'\du'

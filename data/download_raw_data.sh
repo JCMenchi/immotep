@@ -58,11 +58,13 @@ fi
 
 # build exe
 if [ ! -f immotep ]; then
-    if [ ! -f ../srv/api/immotep ]; then
-        rm -rf ../srv/api/immotep
+    if [ ! -d ../srv/api/immotep ]; then
+        if [ ! -d ../ui/immotep ]; then
+            (cd ../ui || return; npm install; npm run build:dist)
+        fi
+        mv ../ui/immotep ../srv/api
     fi
-    (cd ../ui || return; npm install; npm run build:dist)
-    mv ../ui/immotep ../srv/api
+    
     (cd ../srv || return; go build)
     mv ../srv/immotep .
 fi
