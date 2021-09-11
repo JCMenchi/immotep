@@ -87,7 +87,7 @@ func ComputeDepartments(db *gorm.DB) {
 
 func ComputeCities(db *gorm.DB) {
 
-	rows, err := db.Select("transactions.city as name, transactions.city_code as code, AVG(transactions.price_psqm) as avg_price_psqm").
+	rows, err := db.Select("transactions.city_code as code, AVG(transactions.price_psqm) as avg_price_psqm").
 		Table("transactions").
 		Group("city_code").
 		Rows()
@@ -102,14 +102,14 @@ func ComputeCities(db *gorm.DB) {
 	var city2update = make([]map[string]interface{}, 0, batchSize)
 
 	for rows.Next() {
-		var code, name string
+		var code string
 		var avg_price_psqm float64
 
-		rows.Scan(&name, &code, &avg_price_psqm)
+		rows.Scan(&code, &avg_price_psqm)
 
 		city2update = append(city2update, map[string]interface{}{"code": code, "avg_price": avg_price_psqm})
 
-		log.Debugf("City %v (%v) avg psqm: %.0f€\n", name, code, avg_price_psqm)
+		log.Debugf("City (%v) avg psqm: %.0f€\n", code, avg_price_psqm)
 	}
 
 	if len(city2update) <= 0 {

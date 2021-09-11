@@ -99,7 +99,11 @@ func GeocodeDB(dsn string, depcode string) {
 	bar := pb.Default.Start(int(2 * count))
 
 	// batch size 5000
-	batchSize := 5000
+	var batchSize int = int(count / 100)
+	if batchSize > 5000 {
+		batchSize = 5000
+	}
+
 	nbError := 0
 	var trans []model.Transaction
 	result := query.FindInBatches(&trans, batchSize, func(tx *gorm.DB, batch int) error {
