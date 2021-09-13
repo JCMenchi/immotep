@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -23,6 +26,19 @@ var staticFS embed.FS
 func Serve(dsn string, staticDir string, port int, debug bool) {
 	router := BuildRouter(dsn, staticDir, debug)
 
+	// setup signal handling for termination
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Infof("CTRL+C or SIGTERM to stop...")
+		sig := <-sigs
+		fmt.Println()
+		fmt.Println(sig)
+		os.Exit(0)
+	}()
+
+	// start HTTP server
 	router.Run(fmt.Sprintf(":%v", port)) // listen and serve on 0.0.0.0:${port}
 }
 
