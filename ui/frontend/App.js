@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { CssBaseline, Grid, ThemeProvider } from '@material-ui/core';
-import { createTheme } from '@material-ui/core/styles';
+import { CssBaseline, Grid, ThemeProvider } from '@mui/material';
+import { createTheme } from '@mui/material/styles';
 
 import { selectCenterPosition, selectZoom, selectUITheme} from './store/uiparamSlice';
 
