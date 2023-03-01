@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 
-import { Grid, IconButton, TextField, Typography } from '@material-ui/core';
-import { Brightness7, Brightness4, LocationOnSharp } from '@material-ui/icons';
+import { Grid, IconButton, TextField, Typography } from '@mui/material';
+import { Brightness7, Brightness4, LocationOnSharp } from '@mui/icons-material';
 
 import {
     selectUITheme,
