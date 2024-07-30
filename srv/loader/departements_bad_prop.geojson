@@ -1,0 +1,13 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            
+            "properties": {
+                "codeXX": "01",
+                "nomXX": "Ain"
+            }
+        }
+    ]
+}

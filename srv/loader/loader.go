@@ -4,18 +4,21 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/cheggaaa/pb/v3"
 	geojson "github.com/paulmach/go.geojson"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 	"jc.org/immotep/model"
 )
 
@@ -55,11 +58,13 @@ var TYPE_CULTURE_COL = 40
 var FULL_AREA_COL = 42
 
 /*
-	Get data from official zipcode list.
-	CSV file with following layotu
+ReadZipcodeMap gets data from official zipcode list.
+Returns a map of zipcode by city name as integer.
 
-Code_commune_INSEE;Nom_commune;Code_postal;Ligne_5;Libellé_d_acheminement;coordonnees_gps
-02552;NEUVILLETTE;02390;;NEUVILLETTE;49.8554002239,3.46831298648
+Data store in CSV file with following layout:
+
+#Code_commune_INSEE;Nom_de_la_commune;Code_postal;Libellé_d_acheminement;Ligne_5
+01001;L ABERGEMENT CLEMENCIAT;01400;L ABERGEMENT CLEMENCIAT;
 */
 func ReadZipcodeMap(filename string) map[string]int {
 	var zipCodeMap map[string]int = make(map[string]int)
@@ -95,7 +100,7 @@ func ReadZipcodeMap(filename string) map[string]int {
 		zip, err := strconv.Atoi(strings.TrimLeft(row[2], "0"))
 		if err == nil {
 			zipCodeMap[city] = zip
-			// add alternate name with -
+			// add alternate name with - instead of space
 			zipCodeMap[strings.ReplaceAll(city, " ", "-")] = zip
 		}
 
@@ -132,11 +137,11 @@ func lineCounter(filename string) (int, error) {
 
 var badData [][]string = make([][]string, 0, 10)
 
-func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
+func LoadRawData(dsn string, filename string) {
+
+	nbline, _ := lineCounter(filename)
+
 	// open CSV file
-
-	nbline, err := lineCounter(filename)
-
 	f, err := os.Open(filename)
 	if err != nil {
 		log.Errorf("LoadRawData error: %v\n", err)
@@ -185,7 +190,7 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 		if row[TYPE_BIEN_COL] == "Maison" && row[TYPE_VENTE_COL] == "Vente" && row[PRICE_COL] != "" && row[NB_ROOM_COL] != "" {
 			ok := checkNotDuplicate(previousRow, row)
 			if ok {
-				item := createTransaction(row, zipCodeMap)
+				item := createTransaction(dsn, row)
 				if item != nil {
 					nbHouse++
 					transBatch = append(transBatch, item)
@@ -232,7 +237,7 @@ func LoadRawData(dsn string, filename string, zipCodeMap map[string]int) {
 }
 
 /*
-	TODO: merge duplicate surface in main item
+TODO: merge duplicate surface in main item
 */
 func checkNotDuplicate(previousRow, row []string) bool {
 	if len(previousRow) != len(row) {
@@ -252,7 +257,7 @@ func checkNotDuplicate(previousRow, row []string) bool {
 	return true
 }
 
-func createTransaction(row []string, zipCodeMap map[string]int) *model.Transaction {
+func createTransaction(dsn string, row []string) *model.Transaction {
 	hasError := false
 
 	item := model.Transaction{}
@@ -260,23 +265,7 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 	item.Address = fmt.Sprintf("%v %v %v %v", row[STREET_NUMBER_COL], row[STREET_BIS_COL], row[STREET_TYPE_COL], row[STREET_COL])
 	item.City = row[CITY_COL]
 
-	i, err := strconv.Atoi(row[ZIP_COL])
-	if err != nil {
-		// search in map
-		_, ok := zipCodeMap[item.City]
-		if ok {
-			item.ZipCode = zipCodeMap[item.City]
-		} else {
-			log.Errorf("Cannot convert ZIP_CODE %v: %v\n", row, err)
-			item.ZipCode = 0
-			hasError = true
-		}
-	} else {
-		item.ZipCode = i
-		zipCodeMap[item.City] = item.ZipCode
-	}
-
-	i, err = strconv.Atoi(row[NB_ROOM_COL])
+	i, err := strconv.Atoi(row[NB_ROOM_COL])
 	if err != nil {
 		log.Errorf("Cannot convert NB_ROOM_COL %v: %v\n", row, err)
 		item.NbRoom = 0
@@ -290,8 +279,21 @@ func createTransaction(row []string, zipCodeMap map[string]int) *model.Transacti
 	depcode := item.DepartmentCode
 	if len(depcode) == 1 {
 		depcode = "0" + depcode
+	} else if len(depcode) > 2 {
+		// only metropolitan dep
+		return nil
 	}
+
 	item.CityCode = fmt.Sprintf("%v%v%v", depcode, strings.Repeat("0", 3-len(row[CITY_CODE_COL])), row[CITY_CODE_COL])
+
+	if row[ZIP_COL] != "" {
+		item.ZipCode, _ = strconv.Atoi(row[ZIP_COL])
+	} else {
+		item.ZipCode = getZipCodeFromCityCode(dsn, item.CityCode, item.City)
+		if item.ZipCode == -1 {
+			log.Errorf("No zip: (%v)  %v\n", row[ZIP_COL], row)
+		}
+	}
 
 	v, err := strconv.ParseFloat(strings.Replace(row[PRICE_COL], ",", ".", 1), 64)
 	if err != nil {
@@ -367,20 +369,8 @@ ON (t1.department_code = t2.department_code);
 
 Feature property
 			"properties": {
-                "reg_code": "75",
-                "reg_name": "Nouvelle-Aquitaine",
-                "reg_siren_code": "200053759",
-                "reg_is_ctu": "Non",
-                "geo_point_2d": [
-                    45.2068414806,
-                    0.207999527046
-                ],
-                "reg_area_code": "FXX",
-                "reg_current_code": "75",
-                "reg_type": "r\u00e9gion",
-                "year": "2021",
-                "reg_name_lower": "nouvelle-aquitaine",
-                "reg_name_upper": "NOUVELLE AQUITAINE"
+                "code": "75",
+                "nom": "Nouvelle-Aquitaine"
             }
 */
 
@@ -405,7 +395,7 @@ func LoadRegion(dsn string, filename string) error {
 	defer jsonFile.Close()
 	log.Infof("Load region from: %v...\n", filename)
 
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, _ := io.ReadAll(jsonFile)
 
 	var regionsgeo geojson.FeatureCollection
 
@@ -419,13 +409,13 @@ func LoadRegion(dsn string, filename string) error {
 	regions := make([]model.Region, 0, nb)
 	for _, feature := range regionsgeo.Features {
 		var r model.Region
-		r.Name, err = feature.PropertyString("reg_name_upper")
+		r.Name, err = feature.PropertyString("nom")
 		if err != nil {
-			log.Errorf("LoadRegion cannot read property reg_name_upper: %v\n", err)
+			log.Errorf("LoadRegion cannot read property nom: %v\n", err)
 		}
-		r.Code, err = feature.PropertyString("reg_code")
+		r.Code, err = feature.PropertyString("code")
 		if err != nil {
-			log.Errorf("LoadRegion cannot read property reg_code: %v\n", err)
+			log.Errorf("LoadRegion cannot read property code: %v\n", err)
 		}
 		data, err := json.Marshal(feature)
 		if err != nil {
@@ -434,7 +424,9 @@ func LoadRegion(dsn string, filename string) error {
 			r.Contour = string(data)
 		}
 
-		regions = append(regions, r)
+		if r.Name != "" {
+			regions = append(regions, r)
+		}
 	}
 
 	result := db.Create(&regions)
@@ -449,26 +441,26 @@ func LoadRegion(dsn string, filename string) error {
 }
 
 /*
-			"properties": {
-                "reg_code": "84",
-                "dep_is_ctu": "Non",
-                "dep_status": "urbain",
-                "dep_name_upper": "LOIRE",
-                "reg_name": "Auvergne-Rh\u00f4ne-Alpes",
-                "geo_point_2d": [
-                    45.7279998676,
-                    4.16481278582
-                ],
-                "dep_current_code": "42",
-                "dep_name_lower": "loire",
-                "dep_code": "42",
-                "dep_type": "d\u00e9partement",
-                "year": "2021",
-                "dep_area_code": "FXX",
-                "dep_siren_code": "224200014",
-                "dep_name": "Loire",
-                "viewport": "{\"type\": \"Polygon\", \"coordinates\": [[[3.688420154, 45.231033918], [3.688420154, 46.276565491], [4.760377824, 46.276565491], [4.760377824, 45.231033918], [3.688420154, 45.231033918]]]}"
-            }
+				"properties": {
+	                "reg_code": "84",
+	                "dep_is_ctu": "Non",
+	                "dep_status": "urbain",
+	                "dep_name_upper": "LOIRE",
+	                "reg_name": "Auvergne-Rh\u00f4ne-Alpes",
+	                "geo_point_2d": [
+	                    45.7279998676,
+	                    4.16481278582
+	                ],
+	                "dep_current_code": "42",
+	                "dep_name_lower": "loire",
+	                "dep_code": "42",
+	                "dep_type": "d\u00e9partement",
+	                "year": "2021",
+	                "dep_area_code": "FXX",
+	                "dep_siren_code": "224200014",
+	                "dep_name": "Loire",
+	                "viewport": "{\"type\": \"Polygon\", \"coordinates\": [[[3.688420154, 45.231033918], [3.688420154, 46.276565491], [4.760377824, 46.276565491], [4.760377824, 45.231033918], [3.688420154, 45.231033918]]]}"
+	            }
 */
 func LoadDepartment(dsn string, filename string) error {
 	// check if department already loaded
@@ -490,7 +482,7 @@ func LoadDepartment(dsn string, filename string) error {
 	defer jsonFile.Close()
 	log.Infof("Load department from: %v...\n", filename)
 
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, _ := io.ReadAll(jsonFile)
 
 	var departmentsgeo geojson.FeatureCollection
 	err = json.Unmarshal(byteValue, &departmentsgeo)
@@ -503,23 +495,19 @@ func LoadDepartment(dsn string, filename string) error {
 	departments := make([]model.Department, 0, nb)
 	for _, feature := range departmentsgeo.Features {
 		var d model.Department
-		d.Name, err = feature.PropertyString("dep_name_upper")
+		d.Name, err = feature.PropertyString("nom")
 		if err != nil {
-			log.Errorf("LoadDepartment cannot read property dep_name_upper: %v\n", err)
+			log.Errorf("LoadDepartment cannot read property nom: %v\n", err)
 		}
-		d.Code, err = feature.PropertyString("dep_code")
+		d.Code, err = feature.PropertyString("code")
 		if err != nil {
-			log.Errorf("LoadDepartment cannot read property dep_code: %v\n", err)
-		}
-		d.CodeRegion, err = feature.PropertyString("reg_code")
-		if err != nil {
-			log.Errorf("LoadDepartment cannot read property reg_code: %v\n", err)
+			log.Errorf("LoadDepartment cannot read property code: %v\n", err)
 		}
 
-		regcode, err := strconv.Atoi(d.CodeRegion)
+		depcode, err := strconv.Atoi(d.Code)
 
 		// only metropolitan dep
-		if err == nil && regcode >= 11 && regcode <= 94 {
+		if err == nil && d.Name != "" && depcode <= 94 {
 			data, err := json.Marshal(feature)
 			if err != nil {
 				log.Errorf("LoadDepartment cannot marshall contour: %v\n", err)
@@ -541,7 +529,7 @@ func LoadDepartment(dsn string, filename string) error {
 	return nil
 }
 
-func LoadCity(dsn string, filename string) error {
+func LoadCity(dsn string, filename string, geofilename string) error {
 	// check if city already loaded
 	db := model.ConnectToDB(dsn)
 	var count int64
@@ -559,9 +547,30 @@ func LoadCity(dsn string, filename string) error {
 		return err
 	}
 	defer jsonFile.Close()
+
+	// Open our geojsonFile
+	geojsonFile, err := os.Open(geofilename)
+
+	if err != nil {
+		log.Errorf("LoadCity cannot open geo json %v: %v\n", geofilename, err)
+		return err
+	}
+	defer geojsonFile.Close()
+
+	// load geojson data
+	byteValue, _ := io.ReadAll(geojsonFile)
+
+	var communesgeo geojson.FeatureCollection
+	err = json.Unmarshal(byteValue, &communesgeo)
+	if err != nil {
+		log.Errorf("LoadCity cannot decode GEOJSON file %v: %v\n", geofilename, err)
+		return err
+	}
+
+	// load data
 	log.Infof("Load city from: %v...\n", filename)
 
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, _ = io.ReadAll(jsonFile)
 
 	var cities []model.City
 
@@ -576,22 +585,30 @@ func LoadCity(dsn string, filename string) error {
 
 	batchSize := 200
 	cityBatch := make([]model.City, 0, batchSize)
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+
 	for _, city := range cities {
 		bar.Increment()
 		if len(city.CodesPostaux) > 0 {
 			city.ZipCode, _ = strconv.Atoi(city.CodesPostaux[0])
 		}
-		err = GetCityContour(&city)
-		if err != nil {
-			log.Errorf("LoadCity cannot get contour for %v: %v\n", city.Name, err)
-		} else {
-			cityBatch = append(cityBatch, city)
-			if len(cityBatch) == batchSize {
-				result := db.Create(&cityBatch)
-				if result.Error != nil {
-					log.Errorf("Error: %v\n", result.Error)
+
+		city.NameUpper, _, _ = transform.String(t, strings.ToUpper(city.Name))
+
+		dep, _ := strconv.Atoi(city.CodeDepartment)
+		if city.Code != "" && city.CodeDepartment != "" && dep < 100 { // only metropolitan dep
+			city.Contour, err = getCityContour(city.Code, communesgeo)
+			if err != nil {
+				log.Errorf("LoadCity cannot get contour for %v: %v\n", city.Name, err)
+			} else {
+				cityBatch = append(cityBatch, city)
+				if len(cityBatch) == batchSize {
+					result := db.Create(&cityBatch)
+					if result.Error != nil {
+						log.Errorf("Error: %v\n", result.Error)
+					}
+					cityBatch = make([]model.City, 0, batchSize)
 				}
-				cityBatch = make([]model.City, 0, batchSize)
 			}
 		}
 	}
@@ -615,41 +632,99 @@ type CityInfo struct {
 	Contour geojson.Geometry `json:"contour"`
 }
 
-/**
-curl 'https://geo.api.gouv.fr/communes/{codecommune}?fields=code,nom,contour'
-*/
-var geoAPIBaseURL string = "https://geo.api.gouv.fr/communes/"
+func getCityContour(cityCode string, communesgeo geojson.FeatureCollection) (string, error) {
 
-func GetCityContour(city *model.City) error {
+	for idx, feature := range communesgeo.Features {
+		code, err := feature.PropertyString("code")
+		if err != nil {
+			log.Errorf("GetCityContour cannot read property code: %v\n", err)
+		}
 
-	query := geoAPIBaseURL + city.Code + "?fields=code,nom,contour"
-
-	response, err := http.Get(query)
-	if err != nil {
-		log.Errorf("GetCityContour error in HTTP GET: %v\n", err)
-		return err
-	}
-	defer response.Body.Close()
-
-	responseData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Errorf("GetCityContour error reading body: %v\n", err)
-		return err
-	}
-
-	var info CityInfo
-	err = json.Unmarshal(responseData, &info)
-	if err != nil {
-		log.Errorf("GetCityContour unmarshalling error: %v\n %v\n", err, string(responseData))
-		return err
+		// only metropolitan dep
+		if err == nil && code == cityCode {
+			data, errm := json.Marshal(feature)
+			if errm != nil {
+				log.Errorf("GetCityContour cannot read property code: %v\n", err)
+			} else {
+				// delete element to reduce array
+				communesgeo.Features[idx] = communesgeo.Features[len(communesgeo.Features)-1] // Copy last element to index i.
+				communesgeo.Features = communesgeo.Features[:len(communesgeo.Features)-1]     // Truncate slice.
+				return string(data), nil
+			}
+		}
 	}
 
-	data, err := json.Marshal(info.Contour)
-	if err != nil {
-		log.Errorf("GetCityContour cannot marshall contour: %v\n", err)
-		return err
-	}
-	city.Contour = string(data)
+	return "", errors.New("no contour found")
+}
 
-	return nil
+func getDepartementCodeRegion(dsn string, codeDep string) string {
+	db := model.ConnectToDB(dsn)
+
+	// build query
+	rows, err := db.Select("DISTINCT(code_department) as dep, code_region as region").
+		Where("code_department = ?", codeDep).
+		Table("cities").
+		Rows()
+
+	if err != nil {
+		log.Errorf("getDepartementCodeRegion err: %v\n", err)
+		return ""
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var dep, region string
+
+		rows.Scan(&dep, &region)
+
+		return region
+	}
+
+	return ""
+}
+
+func getZipCodeFromCityCode(dsn string, codeCity string, name string) int {
+	db := model.ConnectToDB(dsn)
+
+	// build query
+	rows, err := db.Select("zip_code").
+		Where("code = ?", codeCity).
+		Table("cities").
+		Rows()
+
+	if err != nil {
+		log.Errorf("getZipCodeFromCityCode err: %v\n", err)
+		return -1
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var zip int
+
+		rows.Scan(&zip)
+
+		return zip
+	}
+
+	rows2, err := db.Select("zip_code").
+		Where("name_upper = ?", name).
+		Table("cities").
+		Rows()
+
+	if err != nil {
+		log.Errorf("getZipCodeFromCityCode err: %v\n", err)
+		return -1
+	}
+	defer rows2.Close()
+
+	for rows2.Next() {
+		var zip int
+
+		rows2.Scan(&zip)
+
+		return zip
+	}
+
+	log.Errorf("getZipCodeFromCityCode no zip for: %v\n", codeCity)
+	return -1
 }
