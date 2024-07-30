@@ -14,9 +14,9 @@ import (
 )
 
 /*
-	BUG: in gorm CreateIndexAfterCreateTable is forced to true
-	and autoIncrement is ignored if field is declared as primaryKey
-	but if autoIncrement is set it becomes a primaryKey automagically
+BUG: in gorm CreateIndexAfterCreateTable is forced to true
+and autoIncrement is ignored if field is declared as primaryKey
+but if autoIncrement is set it becomes a primaryKey automagically
 */
 type Transaction struct {
 	TrId           uint64 `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -38,11 +38,11 @@ type Transaction struct {
 }
 
 type Region struct {
-	Code       string       `gorm:"primaryKey" json:"code"`
-	Name       string       `json:"nom"`
-	Contour    string       `json:"contour"`
-	AvgPrice   float64      `json:"avg_price"`
-	Department []Department `gorm:"foreignKey:CodeRegion;references:Code"`
+	Code     string  `gorm:"primaryKey" json:"code"`
+	Name     string  `json:"nom"`
+	Contour  string  `json:"contour"`
+	AvgPrice float64 `json:"avg_price"`
+	City     []City  `gorm:"foreignKey:CodeRegion;references:Code"`
 }
 
 type Department struct {
@@ -57,10 +57,12 @@ type Department struct {
 type City struct {
 	Code           string `gorm:"primaryKey" json:"code"`
 	Name           string `json:"nom"`
+	NameUpper      string
 	ZipCode        int
 	Population     int      `json:"population"`
 	Contour        string   `json:"contour"`
 	CodeDepartment string   `json:"codeDepartement"`
+	CodeRegion     string   `json:"codeRegion"`
 	AvgPrice       float64  `json:"avg_price"`
 	CodesPostaux   []string `gorm:"-" json:"codesPostaux"`
 }
@@ -205,18 +207,19 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 	return &info
 }
 
-/**
-  SELECT tr.city as name,  avg(price_psqm) as ps, cities.contour as geojson FROM transactions as tr
-  LEFT JOIN cities ON tr.city_code = cities.code WHERE tr.department_code = 29
-  group by tr.city_code;
+/*
+*
 
+	SELECT tr.city as name,  avg(price_psqm) as ps, cities.contour as geojson FROM transactions as tr
+	LEFT JOIN cities ON tr.city_code = cities.code WHERE tr.department_code = 29
+	group by tr.city_code;
 */
 type CityInfo struct {
-	Name        string          `json:"name"`
-	Code        string          `json:"code"`
-	ZipCode     int             `json:"zip"`
-	AvgPriceSQM float64         `json:"avgprice"`
-	Contour     geojson.Feature `json:"contour"`
+	Name        string           `json:"name"`
+	Code        string           `json:"code"`
+	ZipCode     int              `json:"zip"`
+	AvgPriceSQM float64          `json:"avgprice"`
+	Contour     *geojson.Feature `json:"contour"`
 }
 
 func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
@@ -238,11 +241,11 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 		info.ZipCode = c.ZipCode
 		info.AvgPriceSQM = c.AvgPrice
 
-		geom, err := geojson.UnmarshalGeometry([]byte(c.Contour))
+		feat, err := geojson.UnmarshalFeature([]byte(c.Contour))
 		if err != nil {
 			log.Errorf("GetCityDetails UnmarshalGeometry err: %v\n", err)
 		} else {
-			info.Contour.Geometry = geom
+			info.Contour = feat
 			info.Contour.SetProperty("avgprice", c.AvgPrice)
 			info.Contour.SetProperty("city", c.Code)
 			info.Contour.SetProperty("population", c.Population)
@@ -277,7 +280,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 		var rinfo RegionInfo
 		rinfo.Name = r.Name
 		rinfo.Code = r.Code
-		rinfo.AvgPriceSQM = r.AvgPrice
+		//rinfo.AvgPriceSQM = r.AvgPrice
 
 		feat, err := geojson.UnmarshalFeature([]byte(r.Contour))
 		if err != nil {

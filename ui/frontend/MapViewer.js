@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { LayersControl, LayerGroup, MapContainer, TileLayer } from "react-leaflet";
+import { useSelector } from 'react-redux';
+import { LayersControl, LayerGroup, MapContainer, TileLayer, FeatureGroup } from "react-leaflet";
+import { EditControl } from "react-leaflet-draw";
 
+import { selectUITheme } from './store/uiparamSlice';
 import { CityStat } from "./CityStat";
 import { LocationMarker } from "./LocationMarker";
 import { DepartmentStat } from "./DepartmentStat";
@@ -19,11 +22,12 @@ export const MapViewer = ({ initposition, initZoom }) => {
     // store pointer to leaflet map object
     /** @type {import("leaflet").Map} */
     const initMap = null
-    const [ map, setMap] = useState(initMap);
+    const [map, setMap] = useState(initMap);
+    const UITheme = useSelector(selectUITheme);
 
     useEffect(() => {
         if (map) {
-            console.log("fly to :", initposition )
+            console.log("fly to :", initposition)
             map.flyTo(initposition)
         }
     }, [initposition]);
@@ -53,12 +57,22 @@ export const MapViewer = ({ initposition, initZoom }) => {
                     <LayersControl.BaseLayer name="Light">
                         <TileLayer
                             url={'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=' + mbtoken}
-                            id='mapbox/light-v9'
+                            id={UITheme === 'dark' ? 'mapbox/dark-v10' : 'mapbox/light-v10'}
                             attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
                             tileSize={512}
                             zoomOffset={-1}
                         />
 
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="GMaps">
+                        <TileLayer url='http://www.google.fr/maps/vt?lyrs=r&x={x}&y={y}&z={z}'
+                            attribution='google'
+                        />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="GMapsH">
+                        <TileLayer url='http://www.google.fr/maps/vt?lyrs=y&x={x}&y={y}&z={z}'
+                            attribution='google'
+                        />
                     </LayersControl.BaseLayer>
 
                     <LayersControl.Overlay name="Region Info">
@@ -77,6 +91,21 @@ export const MapViewer = ({ initposition, initZoom }) => {
                         <LayerGroup>
                             <LocationMarker />
                         </LayerGroup>
+                    </LayersControl.Overlay>
+
+                    <LayersControl.Overlay checked name="Draw">
+                        <FeatureGroup>
+                            <EditControl position='bottomright'
+                                onEdited={(event) => {
+                                    console.log("Edit:", event);
+                                }}
+                                onCreated={(event) => {
+                                    console.log("Creat:", event);
+                                }}
+                                onDeleted={(event) => {
+                                    console.log("Delete:", event);
+                                }} />
+                        </FeatureGroup>
                     </LayersControl.Overlay>
                 </LayersControl>
 

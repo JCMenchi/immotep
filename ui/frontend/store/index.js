@@ -1,9 +1,9 @@
 // REDUX import
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { configureStore, combineReducers, Tuple } from '@reduxjs/toolkit';
 
 // REDUX middleware
 import logger from "redux-logger";
-import thunk from "redux-thunk";
+import {thunk} from "redux-thunk";
 
 // my REDUX reducer
 import { uiParam } from './uiparamSlice';
@@ -19,6 +19,6 @@ const middlewareList = [thunk];
 
 export const store = configureStore({
   reducer: reducers,
-  middleware: middlewareList,
+  middleware: () => new Tuple(thunk),
 })
 

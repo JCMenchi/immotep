@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -102,6 +101,8 @@ func GeocodeDB(dsn string, depcode string) {
 	var batchSize int = int(count / 100)
 	if batchSize > 5000 {
 		batchSize = 5000
+	} else if batchSize == 0 {
+		batchSize = 100
 	}
 
 	nbError := 0
@@ -196,8 +197,8 @@ var baseURL string = "https://api-adresse.data.gouv.fr/search/csv"
 func getGPSCoord(csvdata string) (*csv.Reader, error) {
 
 	// create multipart body message
-	request_body := &bytes.Buffer{}
-	w := multipart.NewWriter(request_body)
+	requestBody := &bytes.Buffer{}
+	w := multipart.NewWriter(requestBody)
 	// specify columns to use
 	w.WriteField("columns", "Address")
 	w.WriteField("columns", "City")
@@ -210,14 +211,14 @@ func getGPSCoord(csvdata string) (*csv.Reader, error) {
 	w.Close()
 
 	// send request
-	response, err := http.Post(baseURL, w.FormDataContentType(), request_body)
+	response, err := http.Post(baseURL, w.FormDataContentType(), requestBody)
 	if err != nil {
 		log.Errorf("getGPSCoord error in HTTP POST: %v\n", err)
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	response_body, err := ioutil.ReadAll(response.Body)
+	response_body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}

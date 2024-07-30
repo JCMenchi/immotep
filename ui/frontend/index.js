@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
-import ReactDOM from "react-dom";
 import { Provider } from 'react-redux';
+import { createRoot } from 'react-dom/client';
+
 
 import '@fontsource/roboto';
 
@@ -11,11 +12,12 @@ import App from "./App";
 
 import { store } from './store';
 
-ReactDOM.render(
+const container = document.getElementById('root');
+const root = createRoot(container);
+root.render(
   <Provider store={store}>
     <Suspense fallback={<h2>loading...</h2>}>
       <App />
     </Suspense>
   </Provider>
-  ,
-  document.getElementById("root"));
+);

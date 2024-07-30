@@ -1,0 +1,12 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "codeXX": "11",
+                "nomXX": "Île-de-France"
+            }
+        }
+    ]
+}

@@ -1,0 +1,18 @@
+{
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon"
+            }
+        },
+        {
+            "type": "Feature",
+            
+            "properties": {
+                "code": "24",
+                "nom": "Centre-Val de Loire"
+            }
+        }
+    ]
+}

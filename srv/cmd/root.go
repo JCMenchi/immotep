@@ -74,18 +74,18 @@ func init() {
 	viper.BindPFlag("dsn.filename", rootCmd.PersistentFlags().Lookup("dsn-filename"))
 
 	// create subcommand
-	loadCmd.PersistentFlags().StringP("zipcode-filename", "z", "", "zip code definition file")
-	viper.BindPFlag("zipcode.filename", loadCmd.PersistentFlags().Lookup("zipcode-filename"))
 	rootCmd.AddCommand(loadCmd)
 
 	rootCmd.AddCommand(geocodeCmd)
 
-	loadConfCmd.PersistentFlags().StringP("region", "r", "", "region JSON file")
+	loadConfCmd.PersistentFlags().StringP("region", "r", "", "region GEOJSON file")
 	viper.BindPFlag("file.region", loadConfCmd.PersistentFlags().Lookup("region"))
-	loadConfCmd.PersistentFlags().String("department", "", "department JSON file")
+	loadConfCmd.PersistentFlags().String("department", "", "department GEOJSON file")
 	viper.BindPFlag("file.department", loadConfCmd.PersistentFlags().Lookup("department"))
 	loadConfCmd.PersistentFlags().String("city", "", "city JSON file")
 	viper.BindPFlag("file.city", loadConfCmd.PersistentFlags().Lookup("city"))
+	loadConfCmd.PersistentFlags().String("citygeo", "", "city GEOJSON file")
+	viper.BindPFlag("file.citygeo", loadConfCmd.PersistentFlags().Lookup("citygeo"))
 	rootCmd.AddCommand(loadConfCmd)
 
 	serveCmd.PersistentFlags().Int("port", 8080, "api server port")
@@ -127,9 +127,12 @@ func initConfig() {
 	}
 }
 
-/* Build database connection string
+/*
+	Build database connection string
+
 e.g. postgres://user:userpwd@pgsql:5432/db?sslmode=disable
-    file:mydata.db
+
+	file:mydata.db
 */
 func getDSN() string {
 	dbtype := viper.GetString("dsn.type")
@@ -158,19 +161,19 @@ var loadCmd = &cobra.Command{
 	Short: "load raw data",
 	Long:  `load raw data`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// load zip code
-		zipcodeMap := loader.ReadZipcodeMap(viper.GetString("zipcode.filename"))
-
 		// load data
 		dsn := getDSN()
 		log.Infof("load data to db: %v\n", dsn)
 		for i, a := range args {
 			log.Infof("load data file(%v): %v\n", i, a)
-			loader.LoadRawData(getDSN(), a, zipcodeMap)
+			loader.LoadRawData(getDSN(), a)
 		}
 	},
 }
 
+/*
+./immotep -f imm.db loadconf --region data/regions.geojson --department data/departements.geojson --city data/communes.json --citygeo data/communes.geojson
+*/
 var loadConfCmd = &cobra.Command{
 	Use:   "loadconf",
 	Short: "load config",
@@ -180,6 +183,7 @@ var loadConfCmd = &cobra.Command{
 		region := viper.GetString("file.region")
 		department := viper.GetString("file.department")
 		city := viper.GetString("file.city")
+		cityGeo := viper.GetString("file.citygeo")
 		// load data
 		dsn := getDSN()
 		log.Infof("load conf to db: %v\n", dsn)
@@ -187,12 +191,15 @@ var loadConfCmd = &cobra.Command{
 		if region != "" {
 			loader.LoadRegion(dsn, region)
 		}
+
 		if department != "" {
 			loader.LoadDepartment(dsn, department)
 		}
+
 		if city != "" {
-			loader.LoadCity(dsn, city)
+			loader.LoadCity(dsn, city, cityGeo)
 		}
+
 	},
 }
 
