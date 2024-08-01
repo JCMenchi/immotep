@@ -25,3 +25,25 @@ Get all communes for a departement
 curl 'https://geo.api.gouv.fr/departements/{depcode}/communes?fields=center'
 
 curl 'https://geo.api.gouv.fr/communes/{codecommune}?fields=code,nom,contour'
+
+# GCP
+
+## Mount gcloud storage inside VM
+
+See doc <https://cloud.google.com/storage/docs/gcsfuse-quickstart-mount-bucket>
+
+export GCSFUSE_REPO=gcsfuse-`lsb_release -c -s`
+echo "deb https://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install fuse gcsfuse
+
+Confirm that Cloud Storage FUSE has been installed:
+
+gcsfuse -v
+
+gcsfuse version 0.41.12 (Go version go1.18.4)
+
+Mount bucket
+mkdir ${HOME}/data
+alias s3mount='gcsfuse im-test-storage ${HOME}/data'

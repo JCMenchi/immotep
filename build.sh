@@ -8,8 +8,8 @@ export FAST_BUILD=0
 
 show_help () {
     echo "Usage: $0 [-h] [-f] [-r registry]"
-    echo "  Build docker file"
-    echo "      -r registry : docker registry (default: ${DOCKER_REGISTRY})"
+    echo "  Build podman file"
+    echo "      -r registry : podman registry (default: ${DOCKER_REGISTRY})"
     echo "      -f          : fast build"
 }
 # Decode args
@@ -46,7 +46,7 @@ fi
     echo "================ UI ========================="
     if [ ! -d node_modules ]; then
         echo "Instal node modules"
-        npm install --no-optional --no-package-lock
+        npm install --omit=optional --no-package-lock
         if [ -d immotep ]; then
             rm -rf immotep
         fi
@@ -66,12 +66,12 @@ fi
 
 echo "================ BACKEND ========================="
 # Package as container
-docker build -t immotep:"${VERSION}" .
+podman build -t immotep:"${VERSION}" .
 
 if [ "${DOCKER_REGISTRY}X" != "X" ]; then
     echo "Deploy to registry: ${DOCKER_REGISTRY}"
-    docker tag immotep:"${VERSION}" "${DOCKER_REGISTRY}"immotep:"${VERSION}"
-    docker push "${DOCKER_REGISTRY}"immotep:"${VERSION}"
+    podman tag immotep:"${VERSION}" "${DOCKER_REGISTRY}"immotep:"${VERSION}"
+    podman push "${DOCKER_REGISTRY}"immotep:"${VERSION}"
 
     echo "================ K8S ========================="
     kubectl apply -f k8s_deploy.yaml

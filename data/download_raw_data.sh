@@ -3,28 +3,10 @@
 
 # Get info about region, department, city
 
-# Official zipcode
-# readable URL is
-# https://datanova.legroupe.laposte.fr/explore/dataset/laposte_hexasmal/download/?format=csv&timezone=Europe/Berlin&use_labels_for_header=true
-
-if [ ! -f zip_code.csv ]; then
-    curl 'https://datanova.legroupe.laposte.fr/explore/dataset/laposte_hexasmal/download/?format=csv&timezone=Europe/Berlin&use_labels_for_header=true' > zip_code.csv
-fi
 
 #
 # Use https://geo.api.gouv for basic administrative info
 #
-# Use laposte for geojson info
-#  https://datanova.legroupe.laposte.fr/api/records/1.0/geopreview/?disjunctive.reg_name=true&sort=year&rows=1000&clusterprecision=6&dataset=georef-france-region&timezone=Europe%2FBerlin
-# 
-if [ ! -f regions.geojson ]; then
-    curl 'https://datanova.legroupe.laposte.fr/explore/dataset/georef-france-region/download/?format=geojson&timezone=Europe/Berlin' > regions.geojson
-fi
-
-if [ ! -f departements.geojson ]; then
-    curl 'https://datanova.legroupe.laposte.fr/explore/dataset/georef-france-departement/download/?format=geojson&timezone=Europe/Berlin' > departements.geojson
-fi
-
 if [ ! -f communes.json ]; then
     curl 'https://geo.api.gouv.fr/communes' > communes.json
 fi
@@ -34,16 +16,38 @@ fi
 # https://www.data.gouv.fr/fr/datasets/demandes-de-valeurs-foncieres/
 #
 
-DVF_BASE_URL=https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20210330-
+DVF_BASE_URL=https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20240408-
+
+if [ ! -f valeursfoncieres-2023.txt ]; then
+    # static url https://www.data.gouv.fr/fr/datasets/r/78348f03-a11c-4a6b-b8db-2acf4fee81b1
+    curl ${DVF_BASE_URL}125738/valeursfoncieres-2023.txt > valeursfoncieres-2023.txt
+fi
+
+if [ ! -f valeursfoncieres-2022.txt ]; then
+    # curl https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20221017-152027/valeursfoncieres-2022-s1.txt > valeursfoncieres-2022.txt
+    curl ${DVF_BASE_URL}130630/valeursfoncieres-2022.txt > valeursfoncieres-2022.txt
+    # static url https://www.data.gouv.fr/fr/datasets/r/87038926-fb31-4959-b2ae-7a24321c599a
+fi
+
+if [ ! -f valeursfoncieres-2021.txt ]; then
+    #curl https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20221017-151704/valeursfoncieres-2021.txt > valeursfoncieres-2021.txt
+    curl ${DVF_BASE_URL}130153/valeursfoncieres-2021.txt > valeursfoncieres-2021.txt
+    # static url https://www.data.gouv.fr/fr/datasets/r/817204ac-2202-4b4a-98e7-4184d154d98c
+fi
 
 if [ ! -f valeursfoncieres-2020.txt ]; then
-    curl ${DVF_BASE_URL}102242/valeursfoncieres-2020.txt > valeursfoncieres-2020.txt
+    #curl ${DVF_BASE_URL}102242/valeursfoncieres-2020.txt > valeursfoncieres-2020.txt
+    curl ${DVF_BASE_URL}125058/valeursfoncieres-2020.txt > valeursfoncieres-2020.txt
+    # static url https://www.data.gouv.fr/fr/datasets/r/90a98de0-f562-4328-aa16-fe0dd1dca60f
 fi
 
 if [ ! -f valeursfoncieres-2019.txt ]; then
-    curl ${DVF_BASE_URL}102025/valeursfoncieres-2019.txt > valeursfoncieres-2019.txt
+    #curl ${DVF_BASE_URL}102025/valeursfoncieres-2019.txt > valeursfoncieres-2019.txt
+    curl ${DVF_BASE_URL}124817/valeursfoncieres-2019.txt > valeursfoncieres-2019.txt
+    # static url https://www.data.gouv.fr/fr/datasets/r/3004168d-bec4-44d9-a781-ef16f41856a2
 fi
 
+DVF_BASE_URL=https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20210330-
 if [ ! -f valeursfoncieres-2018.txt ]; then
     curl ${DVF_BASE_URL}101812/valeursfoncieres-2018.txt > valeursfoncieres-2018.txt
 fi
@@ -71,8 +75,16 @@ fi
 
 # Build database from raw data
 if [ ! -f imm.db ]; then
-    ./immotep -f imm.db loadconf --region regions.geojson --department departements.geojson --city communes.json
-    ./immotep -f imm.db load -z zip_code.csv valeursfoncieres-20*.txt
+    ./immotep -f imm.db loadconf --region regions.geojson --department departements.geojson --city communes.json --citygeo communes.geojson
+    ./immotep -f imm.db load valeursfoncieres-20*.txt
     ./immotep -f imm.db geocode
     ./immotep -f imm.db compute
 fi
+
+./immotep loadconf --region ../data/regions.geojson --department ../data/departements.geojson --city ../data/communes.json --citygeo ../data/communes.geojson
+./immotep load ../data/valeursfoncieres-small.txt
+./immotep compute
+
+./immotep loadconf --region data/regions.geojson --department data/departements.geojson --city data/communes.json --citygeo data/communes.geojson
+./immotep load ../data/valeursfoncieres-small.txt
+./immotep compute

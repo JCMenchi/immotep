@@ -55,9 +55,12 @@ module.exports = {
       publicPath: "http://localhost:3000/immotep",
     },
     hot: true,
-    proxy: {
-      '/api': 'http://localhost:8081/'
-    }
+    proxy: [
+      {
+        context: ['/api'],
+        target: 'http://34.44.29.28/',
+      },
+    ]
   },
   plugins: [
     new webpack.ProgressPlugin(),
