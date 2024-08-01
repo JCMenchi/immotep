@@ -504,10 +504,8 @@ func LoadDepartment(dsn string, filename string) error {
 			log.Errorf("LoadDepartment cannot read property code: %v\n", err)
 		}
 
-		depcode, err := strconv.Atoi(d.Code)
-
 		// only metropolitan dep
-		if err == nil && d.Name != "" && depcode <= 94 {
+		if err == nil && d.Name != "" && len(d.Code) < 3 {
 			data, err := json.Marshal(feature)
 			if err != nil {
 				log.Errorf("LoadDepartment cannot marshall contour: %v\n", err)
@@ -595,8 +593,7 @@ func LoadCity(dsn string, filename string, geofilename string) error {
 
 		city.NameUpper, _, _ = transform.String(t, strings.ToUpper(city.Name))
 
-		dep, _ := strconv.Atoi(city.CodeDepartment)
-		if city.Code != "" && city.CodeDepartment != "" && dep < 100 { // only metropolitan dep
+		if city.Code != "" && city.CodeDepartment != "" && len(city.CodeDepartment) < 3 { // only metropolitan dep
 			city.Contour, err = getCityContour(city.Code, communesgeo)
 			if err != nil {
 				log.Errorf("LoadCity cannot get contour for %v: %v\n", city.Name, err)

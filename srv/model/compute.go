@@ -9,8 +9,8 @@ import (
 
 func ComputeRegions(db *gorm.DB) {
 	rows, err := db.Select("regions.name as name, regions.code as code, AVG(transactions.price_psqm) as avg_price_psqm").
-		Joins("LEFT JOIN departments ON departments.code = transactions.department_code").
-		Joins("LEFT JOIN regions ON regions.code = departments.code_region").
+		Joins("LEFT JOIN cities ON cities.code = transactions.city_code").
+		Joins("LEFT JOIN regions ON regions.code = cities.code_region").
 		Table("transactions").
 		Group("regions.code").
 		Rows()
