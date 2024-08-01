@@ -18,5 +18,13 @@ cp immotep.env /etc/default/immotep
 cp immotep.service /etc/systemd/system
 cp ../../srv/immotep /usr/bin
 
+setcap 'cap_net_bind_service=+ep' /usr/bin/immotep
+
+# create database
+su postgres -c "psql -dpostgres -c \"CREATE USER immotep WITH PASSWORD 'imm.pwd12'\" "
+su postgres -c "psql -dpostgres -c \"CREATE DATABASE immdb WITH OWNER = 'immotep'\" "
+su postgres -c "psql -dpostgres -c \"GRANT ALL PRIVILEGES ON DATABASE immdb to immotep;\" "
+
+
 systemctl enable immotep.service
 systemctl start immotep.service
