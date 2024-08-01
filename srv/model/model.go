@@ -46,12 +46,11 @@ type Region struct {
 }
 
 type Department struct {
-	Code       string  `gorm:"primaryKey" json:"code"`
-	Name       string  `json:"nom"`
-	CodeRegion string  `json:"codeRegion"`
-	Contour    string  `json:"contour"`
-	AvgPrice   float64 `json:"avg_price"`
-	City       []City  `gorm:"foreignKey:CodeDepartment;references:Code"`
+	Code     string  `gorm:"primaryKey" json:"code"`
+	Name     string  `json:"nom"`
+	Contour  string  `json:"contour"`
+	AvgPrice float64 `json:"avg_price"`
+	City     []City  `gorm:"foreignKey:CodeDepartment;references:Code"`
 }
 
 type City struct {

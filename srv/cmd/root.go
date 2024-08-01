@@ -95,6 +95,7 @@ func init() {
 	rootCmd.AddCommand(serveCmd)
 
 	rootCmd.AddCommand(computeCmd)
+	rootCmd.AddCommand(aggregateCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -231,6 +232,18 @@ var computeCmd = &cobra.Command{
 		dsn := getDSN()
 		log.Infof("compute db: %v\n", dsn)
 		model.ComputeStat(dsn)
+	},
+}
+
+var aggregateCmd = &cobra.Command{
+	Use:   "aggregate",
+	Short: "aggregate db",
+	Long:  `aggregate db`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// geo code address
+		dsn := getDSN()
+		log.Infof("aggregate db: %v\n", dsn)
+		model.AggregateData(dsn)
 	},
 }
 
