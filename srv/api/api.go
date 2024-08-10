@@ -95,6 +95,7 @@ type FilterInfoBody struct {
 
 type POISQuery struct {
 	Limit   int    `form:"limit"`
+	Year    int    `form:"year"`
 	ZipCode int    `form:"zip"`
 	DepCode string `form:"dep"`
 	After   string `form:"after"`
@@ -148,12 +149,16 @@ func addRoutes(rg *gin.RouterGroup) {
 		}
 
 		limit := -1
+		year := -1
 
 		// get value from query param
 		var param POISQuery
 		if c.ShouldBindQuery(&param) == nil {
 			if param.Limit >= 0 {
 				limit = param.Limit
+			}
+			if param.Year >= 0 {
+				year = param.Year
 			}
 		}
 
@@ -168,7 +173,7 @@ func addRoutes(rg *gin.RouterGroup) {
 		pois := model.GetPOIFromBounds(immotepDB,
 			body.NorthEast.Lat, body.NorthEast.Long,
 			body.SouthWest.Lat, body.SouthWest.Long,
-			limit, body.DepCode, body.After)
+			limit, body.DepCode, body.After, year)
 
 		if pois == nil {
 			c.JSON(500, "[]")

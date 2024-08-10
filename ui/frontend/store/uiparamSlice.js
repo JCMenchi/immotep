@@ -11,7 +11,8 @@ export const uiParam = createSlice({
     currentPosition: JSON.parse(localStorage.getItem('ui_center')) || [48.6007, -4.0451],
     zoom: localStorage.getItem('ui_zoom') || 10,
     avgPrice: -1,
-    avgPriceSQM: -1
+    avgPriceSQM: -1,
+    year: -1
   },
   reducers: {
     changeQueryLimit(state, action) {
@@ -43,13 +44,16 @@ export const uiParam = createSlice({
     },
     changeAvgPriceSQM(state, action) {
       state.avgPriceSQM = action.payload;
+    },
+    changeYear(state, action) {
+      state.year = action.payload;
     }
   }
 });
 
 export const { changeQueryLimit, changeQueryDepartment,
   changeUITheme, changeUILanguage,
-  changePosition, changeZoom,
+  changePosition, changeZoom, changeYear,
   changeAvgPrice, changeAvgPriceSQM } = uiParam.actions;
 
 // some selector
@@ -61,3 +65,4 @@ export const selectQueryLimit = state => state.uiParam.queryLimit;
 export const selectQueryDepartment = state => state.uiParam.queryDepartment;
 export const selectAvgPrice = state => state.uiParam.avgPrice;
 export const selectAvgPriceSQM = state => state.uiParam.avgPriceSQM;
+export const selectYear= state => state.uiParam.year;

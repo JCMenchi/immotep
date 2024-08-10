@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from 'react-redux';
 
 import { Marker, useMapEvents, Popup } from "react-leaflet";
@@ -10,7 +10,8 @@ import {
     changeZoom,
     changePosition,
     selectQueryLimit,
-    selectQueryDepartment
+    selectQueryDepartment,
+    selectYear
 } from './store/uiparamSlice';
 
 export const LocationMarker = () => {
@@ -18,6 +19,7 @@ export const LocationMarker = () => {
     // state from redux global store
     const limit = useSelector(selectQueryLimit);
     const department = useSelector(selectQueryDepartment);
+    const year = useSelector(selectYear);
 
     // get reducer dispatcher
     const dispatch = useDispatch();
@@ -51,7 +53,7 @@ export const LocationMarker = () => {
             dispatch(changeZoom(map.getZoom()));
 
             // need to reload data with new bounds
-            service.post("api/pois/filter?limit=" + limit, bounds)
+            service.post("api/pois/filter?limit=" + limit + "&year=" + year, bounds)
                 .then((response) => {
                     const tr = response.data;
                     setTransactions(tr.transactions);
@@ -75,6 +77,33 @@ export const LocationMarker = () => {
 
     })
 
+    useEffect(() => {
+        const bounds = {
+            northEast: map.getBounds()._northEast,
+            southWest: map.getBounds()._southWest,
+            code: department
+        }
+        // need to reload data
+        service.post("api/pois/filter?limit=" + limit + "&year=" + year, bounds)
+            .then((response) => {
+                const tr = response.data;
+                setTransactions(tr.transactions);
+
+                if (tr.avgprice > 0) {
+                    dispatch(changeAvgPrice(tr.avgprice));
+                } else {
+                    dispatch(changeAvgPrice(-1));
+                }
+                if (tr.avgprice_sqm > 0) {
+                    dispatch(changeAvgPriceSQM(tr.avgprice_sqm));
+                } else {
+                    dispatch(changeAvgPriceSQM(-1));
+                }
+
+            }).catch((error) => {
+                console.error('Failed to load pois:', error);
+            });
+    }, [year, department, limit]);
 
     return (
         <div>

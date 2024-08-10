@@ -42,7 +42,13 @@ export const CityStat = () => {
             {cityInfos && cityInfos.map(item => (
                 <GeoJSON key={item.name} data={item.contour} style={computeCityContourStyle}>
                     <Tooltip>
-                        {`(${item.zip}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
+                        {`(${item.zip}) ${item.name}: ${item.avgprice.toFixed(0)}€`}<br /> {`Population: ${item.population}`}<br /> 
+                        { item.stat && Object.keys(item.stat).map((k,i) => {
+                                return (
+                                    <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
+                                )
+                            })
+                        }
                     </Tooltip>
                 </GeoJSON>
             ))}

@@ -19,9 +19,9 @@ and autoIncrement is ignored if field is declared as primaryKey
 but if autoIncrement is set it becomes a primaryKey automagically
 */
 type Transaction struct {
-	TrId           uint64 `gorm:"primaryKey;autoIncrement" json:"id"`
-	Date           time.Time
-	Address        string `json:"address"`
+	TrId           uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	Date           time.Time `gorm:"index"`
+	Address        string    `json:"address"`
 	ZipCode        int
 	City           string
 	CityCode       string
@@ -33,8 +33,8 @@ type Transaction struct {
 	NbRoom         int
 	Cadastre       string
 	TypeCulture    string
-	Lat            float64
-	Long           float64
+	Lat            float64 `gorm:"index"`
+	Long           float64 `gorm:"index"`
 }
 
 type Region struct {
@@ -103,14 +103,18 @@ func ConnectToDB(dsn string) *gorm.DB {
 }
 
 type TransactionPOI struct {
-	TrId    uint64    `gorm:"primaryKey" json:"id"`
-	Date    time.Time `json:"date"`
-	Address string    `json:"address"`
-	City    string    `json:"city"`
-	Price   float64   `json:"price"`
-	Area    int       `json:"area"`
-	Lat     float64   `json:"lat"`
-	Long    float64   `json:"long"`
+	TrId      uint64    `gorm:"primaryKey" json:"id"`
+	Date      time.Time `json:"date"`
+	Address   string    `json:"address"`
+	City      string    `json:"city"`
+	Price     float64   `json:"price"`
+	Area      int       `json:"area"`
+	Lat       float64   `json:"lat"`
+	Long      float64   `json:"long"`
+	PricePSQM float64   `json:"pricepsqm"`
+	FullArea  int       `json:"fullarea"`
+	NbRoom    int       `json:"nbroom"`
+	Cadastre  string    `json:"cadastre"`
 }
 
 func (TransactionPOI) TableName() string {
@@ -156,7 +160,7 @@ type BoundedTransactionInfo struct {
 	AvgPriceSQM float64          `json:"avgprice_sqm"`
 }
 
-func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int, dep string, after string) *BoundedTransactionInfo {
+func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int, dep string, after string, year int) *BoundedTransactionInfo {
 
 	var info BoundedTransactionInfo
 
@@ -166,7 +170,9 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 		whereClause = fmt.Sprintf("%v AND department_code = '%v'", whereClause, dep)
 	}
 
-	if after != "" {
+	if year > 0 {
+		whereClause = fmt.Sprintf("%v AND date >= '%v-01-01' AND date < '%v-01-01'", whereClause, year, year+1)
+	} else if after != "" {
 		whereClause = fmt.Sprintf("%v AND date > \"%v\"", whereClause, after)
 	}
 
@@ -219,12 +225,21 @@ type CityInfo struct {
 	ZipCode     int              `json:"zip"`
 	AvgPriceSQM float64          `json:"avgprice"`
 	Contour     *geojson.Feature `json:"contour"`
+	Population  int              `json:"population"`
+	Stat        map[int]string   `json:"stat"`
 }
 
 func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 	var cities []City
 
-	result := db.Where("code_department = ?", dep).Find(&cities)
+	query := db
+	if dep != "" {
+		query = db.Where("code_department = ?", dep)
+	} else {
+		query = db.Limit(100)
+	}
+
+	result := query.Find(&cities)
 
 	if result.Error != nil {
 		log.Errorf("GetRegionDetails err: %v\n", result.Error)
@@ -239,6 +254,7 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 		info.Code = c.Code
 		info.ZipCode = c.ZipCode
 		info.AvgPriceSQM = c.AvgPrice
+		info.Population = c.Population
 
 		feat, err := geojson.UnmarshalFeature([]byte(c.Contour))
 		if err != nil {
@@ -248,6 +264,9 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 			info.Contour.SetProperty("avgprice", c.AvgPrice)
 			info.Contour.SetProperty("city", c.Code)
 			info.Contour.SetProperty("population", c.Population)
+
+			info.Stat = getCityStat(db, c.Code)
+
 			cityinfos = append(cityinfos, info)
 		}
 	}
@@ -255,11 +274,30 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 	return cityinfos
 }
 
+func getCityStat(db *gorm.DB, s string) map[int]string {
+	var statMap map[int]string = make(map[int]string)
+
+	var stat []CityYearlyAgg
+
+	result := db.Where("code = ?", s).Find(&stat)
+
+	if result.Error != nil {
+		log.Errorf("getCityStat err: %v\n", result.Error)
+	} else {
+		for _, s := range stat {
+			statMap[s.Year] = fmt.Sprintf("%.0f€/m² (%.1f%%)", s.AvgPrice, s.Increase*100)
+		}
+	}
+
+	return statMap
+}
+
 type RegionInfo struct {
 	Code        string           `json:"code"`
 	Name        string           `json:"name"`
 	AvgPriceSQM float64          `json:"avgprice"`
 	Contour     *geojson.Feature `json:"contour"`
+	Stat        map[int]string   `json:"stat"`
 }
 
 func GetRegionDetails(db *gorm.DB) []RegionInfo {
@@ -279,7 +317,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 		var rinfo RegionInfo
 		rinfo.Name = r.Name
 		rinfo.Code = r.Code
-		//rinfo.AvgPriceSQM = r.AvgPrice
+		rinfo.AvgPriceSQM = r.AvgPrice
 
 		feat, err := geojson.UnmarshalFeature([]byte(r.Contour))
 		if err != nil {
@@ -288,6 +326,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 			rinfo.Contour = feat
 			rinfo.Contour.SetProperty("avgprice", rinfo.AvgPriceSQM)
 			rinfo.Contour.SetProperty("name", rinfo.Name)
+			rinfo.Stat = getRegionStat(db, r.Code)
 		}
 
 		reginfos = append(reginfos, rinfo)
@@ -296,11 +335,30 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 	return reginfos
 }
 
+func getRegionStat(db *gorm.DB, s string) map[int]string {
+	var statMap map[int]string = make(map[int]string)
+
+	var stat []RegionYearlyAgg
+
+	result := db.Where("code = ?", s).Find(&stat)
+
+	if result.Error != nil {
+		log.Errorf("getRegionStat err: %v\n", result.Error)
+	} else {
+		for _, s := range stat {
+			statMap[s.Year] = fmt.Sprintf("%.0f€/m² (%.1f%%)", s.AvgPrice, s.Increase*100)
+		}
+	}
+
+	return statMap
+}
+
 type DepartmentInfo struct {
 	Name        string           `json:"name"`
 	Code        string           `json:"code"`
 	AvgPriceSQM float64          `json:"avgprice"`
 	Contour     *geojson.Feature `json:"contour"`
+	Stat        map[int]string   `json:"stat"`
 }
 
 func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
@@ -329,10 +387,29 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 			dinfo.Contour = feat
 			dinfo.Contour.SetProperty("avgprice", dinfo.AvgPriceSQM)
 			dinfo.Contour.SetProperty("name", dinfo.Name)
+			dinfo.Stat = getDepartmentStat(db, d.Code)
 		}
 
 		depinfos = append(depinfos, dinfo)
 	}
 
 	return depinfos
+}
+
+func getDepartmentStat(db *gorm.DB, s string) map[int]string {
+	var statMap map[int]string = make(map[int]string)
+
+	var stat []DepartmentYearlyAgg
+
+	result := db.Where("code = ?", s).Find(&stat)
+
+	if result.Error != nil {
+		log.Errorf("getDepartmentStat err: %v\n", result.Error)
+	} else {
+		for _, s := range stat {
+			statMap[s.Year] = fmt.Sprintf("%.0f€/m² (%.1f%%)", s.AvgPrice, s.Increase*100)
+		}
+	}
+
+	return statMap
 }
