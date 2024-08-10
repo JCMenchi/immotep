@@ -35,6 +35,12 @@ export const RegionStat = () => {
                 <GeoJSON key={item.name} data={item.contour} style={computeRegionContourStyle}>
                     <Tooltip>
                         {`(${item.code}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
+                        { item.stat && Object.keys(item.stat).map((k,i) => {
+                                return (
+                                    <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
+                                )
+                            })
+                        }
                     </Tooltip>
                 </GeoJSON>
             ))}

@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { LayersControl, LayerGroup, MapContainer, TileLayer, FeatureGroup } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 
-import { selectUITheme } from './store/uiparamSlice';
+import { selectUITheme, selectCenterPosition } from './store/uiparamSlice';
 import { CityStat } from "./CityStat";
 import { LocationMarker } from "./LocationMarker";
 import { DepartmentStat } from "./DepartmentStat";
@@ -19,18 +19,17 @@ const mbbaseurl = "https://api.mapbox.com/styles/v1/jcmenchi/";
 const mbtoken = "pk.eyJ1IjoiamNtZW5jaGkiLCJhIjoiY2tyaTQxOXZjMGM4YTJ1cnZ0ZGM0eWdlbSJ9.Cqy-UGrsUUWAGF8mFPUiGg";
 
 export const MapViewer = ({ initposition, initZoom }) => {
-    // store pointer to leaflet map object
-    /** @type {import("leaflet").Map} */
-    const initMap = null
-    const [map, setMap] = useState(initMap);
+
+    const position = useSelector(selectCenterPosition);
     const UITheme = useSelector(selectUITheme);
+    const [map, setMap] = useState(null);
 
     useEffect(() => {
         if (map) {
-            console.log("fly to :", initposition)
-            map.flyTo(initposition)
+            console.log("fly to :", position)
+            map.flyTo(position)
         }
-    }, [initposition]);
+    }, [position]);
 
     return (
         <div id="map" style={style}>
@@ -39,7 +38,7 @@ export const MapViewer = ({ initposition, initZoom }) => {
                 maxZoom={22}
                 scrollWheelZoom={true}
                 style={style}
-                whenCreated={setMap}
+                ref={setMap}
             >
                 <LayersControl position="topright">
                     <LayersControl.BaseLayer checked name="Map">
