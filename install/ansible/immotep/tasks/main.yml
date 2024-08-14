@@ -1,0 +1,133 @@
+---
+# tasks file for immotep
+- name: Update and upgrade apt packages
+  become: true
+  ansible.builtin.apt:
+    upgrade: true
+    update_cache: true
+    cache_valid_time: 86400 # One day
+
+- name: Install postgresql
+  become: true
+  ansible.builtin.apt:
+    name:
+      - postgresql
+      - python3-psycopg2 # lib used by ansible tasks for postgresql operation
+      - acl # needed to run task as postgres user
+    state: present
+
+- name: Create user
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_user:
+    name: immotep
+    login_host: localhost
+    login_unix_socket: /var/run/postgresql
+    password: "{{ pgdb_passwd }}"
+    role_attr_flags: NOSUPERUSER
+
+- name: Create database
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_db:
+    name: immdb
+    comment: immotep db
+    owner: immotep
+    login_host: localhost
+    login_unix_socket: /var/run/postgresql
+
+- name: Create immotep group
+  ansible.builtin.group:
+    name: immotep
+    state: present
+
+- name: Create immotep user
+  ansible.builtin.user:
+    name: immotep
+    groups: immotep
+    append: true
+    state: present
+    create_home: true
+
+- name: Creates data directory
+  ansible.builtin.file:
+    path: /data
+    mode: '750'
+    owner: immotep
+    group: immotep
+    state: directory
+
+- name: Copy env file
+  ansible.builtin.template:
+    src: files/immotep.env.j2
+    dest: /etc/default/immotep.env
+    mode: '400'
+    owner: immotep
+    group: immotep
+  notify:
+    - Restart immotep
+
+- name: Copy load script
+  ansible.builtin.copy:
+    src: load_data.sh
+    dest: /data/
+    mode: '700'
+    owner: immotep
+    group: immotep
+
+- name: Copy systemd service file to server
+  ansible.builtin.copy:
+    src: immotep.service
+    dest: /etc/systemd/system
+    owner: root
+    group: root
+  notify:
+    - Reload immotep
+
+- name: Copy binary to server
+  ansible.builtin.copy:
+    src: immotep
+    dest: /usr/bin
+    mode: '755'
+    owner: root
+    group: root
+  notify:
+    - Restart immotep
+
+- name: Set cap_net_bind_service 
+  community.general.capabilities:
+    path: /usr/bin/immotep
+    capability: cap_net_bind_service=ep
+    state: present
+
+- name: Download geographical info
+  ansible.builtin.get_url:
+    url: "https://www.googleapis.com/download/storage/v1/b/immotep-storage/o/{{ item }}?alt=media"
+    dest: /data/{{ item }}
+    mode: '0440'
+    owner: immotep
+    group: immotep
+  loop:
+    - departements.geojson.xz
+    - communes.geojson.xz
+    - communes.json.xz
+    - regions.geojson.xz
+
+- name: Download data
+  ansible.builtin.get_url:
+    url: "https://www.googleapis.com/download/storage/v1/b/immotep-storage/o/{{ item }}?alt=media"
+    dest: /data/{{ item }}
+    mode: '0440'
+    owner: immotep
+    group: immotep
+  loop:
+    - valeursfoncieres-2016.txt.xz
+    - valeursfoncieres-2017.txt.xz
+    - valeursfoncieres-2018.txt.xz
+    - valeursfoncieres-2019.txt.xz
+    - valeursfoncieres-2020.txt.xz
+    - valeursfoncieres-2021.txt.xz
+    - valeursfoncieres-2022.txt.xz
+    - valeursfoncieres-2023.txt.xz

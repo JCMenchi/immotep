@@ -1,0 +1,20 @@
+---
+# handlers file for immotep
+- name: Start immotep
+  ansible.builtin.systemd:
+    name: immotep
+    state: started
+    enabled: true
+
+- name: Restart immotep
+  ansible.builtin.systemd:
+    name: immotep
+    state: restarted
+    enabled: true
+
+- name: Reload immotep
+  ansible.builtin.systemd:
+    name: immotep
+    daemon_reload: true
+    state: reloaded
+    enabled: true

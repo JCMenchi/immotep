@@ -1,0 +1,6 @@
+- name: IMMOTEP
+  hosts: gcphosts
+  become: true
+  become_user: root
+  roles:
+    - immotep

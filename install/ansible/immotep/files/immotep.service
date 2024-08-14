@@ -1,0 +1,14 @@
+[Unit]
+Description=immotep backend service
+After=syslog.target
+After=network.target
+
+[Service]
+User=immotep
+Group=immotep
+
+EnvironmentFile=/etc/default/immotep.env
+ExecStart=/usr/bin/immotep serve
+
+[Install]
+WantedBy=multi-user.target
