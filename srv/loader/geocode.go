@@ -201,8 +201,7 @@ func getGPSCoord(csvdata string) (*csv.Reader, error) {
 	w := multipart.NewWriter(requestBody)
 	// specify columns to use
 	w.WriteField("columns", "Address")
-	w.WriteField("columns", "City")
-	w.WriteField("columns", "ZipCode")
+	w.WriteField("postcode", "ZipCode")
 	// add data file
 	datapart, _ := w.CreateFormFile("data", "address.csv")
 	// copy csv data it to its part

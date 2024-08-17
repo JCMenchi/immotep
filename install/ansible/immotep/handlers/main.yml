@@ -1,16 +1,11 @@
 ---
 # handlers file for immotep
-- name: Start immotep
-  ansible.builtin.systemd:
-    name: immotep
-    state: started
-    enabled: true
-
 - name: Restart immotep
   ansible.builtin.systemd:
     name: immotep
     state: restarted
     enabled: true
+  when: "'immotep.service' in ansible_facts.services"
 
 - name: Reload immotep
   ansible.builtin.systemd:
@@ -18,3 +13,4 @@
     daemon_reload: true
     state: reloaded
     enabled: true
+  when: "'immotep.service' in ansible_facts.services"

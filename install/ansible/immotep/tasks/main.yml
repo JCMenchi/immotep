@@ -7,6 +7,10 @@
     update_cache: true
     cache_valid_time: 86400 # One day
 
+- name: Populate service facts
+  ansible.builtin.service_facts:
+
+# Postgresql
 - name: Install postgresql
   become: true
   ansible.builtin.apt:
@@ -16,7 +20,7 @@
       - acl # needed to run task as postgres user
     state: present
 
-- name: Create user
+- name: Create db role
   become: true
   become_user: postgres
   become_method: ansible.builtin.sudo
@@ -38,6 +42,7 @@
     login_host: localhost
     login_unix_socket: /var/run/postgresql
 
+# Create immotep user
 - name: Create immotep group
   ansible.builtin.group:
     name: immotep
@@ -51,6 +56,7 @@
     state: present
     create_home: true
 
+# Collect raw data
 - name: Creates data directory
   ansible.builtin.file:
     path: /data
@@ -59,16 +65,6 @@
     group: immotep
     state: directory
 
-- name: Copy env file
-  ansible.builtin.template:
-    src: files/immotep.env.j2
-    dest: /etc/default/immotep.env
-    mode: '400'
-    owner: immotep
-    group: immotep
-  notify:
-    - Restart immotep
-
 - name: Copy load script
   ansible.builtin.copy:
     src: load_data.sh
@@ -76,31 +72,6 @@
     mode: '700'
     owner: immotep
     group: immotep
-
-- name: Copy systemd service file to server
-  ansible.builtin.copy:
-    src: immotep.service
-    dest: /etc/systemd/system
-    owner: root
-    group: root
-  notify:
-    - Reload immotep
-
-- name: Copy binary to server
-  ansible.builtin.copy:
-    src: immotep
-    dest: /usr/bin
-    mode: '755'
-    owner: root
-    group: root
-  notify:
-    - Restart immotep
-
-- name: Set cap_net_bind_service 
-  community.general.capabilities:
-    path: /usr/bin/immotep
-    capability: cap_net_bind_service=ep
-    state: present
 
 - name: Download geographical info
   ansible.builtin.get_url:
@@ -131,3 +102,45 @@
     - valeursfoncieres-2021.txt.xz
     - valeursfoncieres-2022.txt.xz
     - valeursfoncieres-2023.txt.xz
+
+# Create service
+- name: Copy env file
+  ansible.builtin.template:
+    src: files/immotep.env.j2
+    dest: /etc/default/immotep.env
+    mode: '400'
+    owner: immotep
+    group: immotep
+  notify:
+    - Restart immotep
+
+- name: Copy systemd service file to server
+  ansible.builtin.copy:
+    src: immotep.service
+    dest: /etc/systemd/system
+    owner: root
+    group: root
+  notify:
+    - Reload immotep
+
+- name: Copy binary to server
+  ansible.builtin.copy:
+    src: immotep
+    dest: /usr/bin
+    mode: '755'
+    owner: root
+    group: root
+  notify:
+    - Restart immotep
+
+- name: Set cap_net_bind_service 
+  community.general.capabilities:
+    path: /usr/bin/immotep
+    capability: cap_net_bind_service=ep
+    state: present
+
+- name: Start immotep
+  ansible.builtin.systemd:
+    name: immotep
+    state: started
+    enabled: true

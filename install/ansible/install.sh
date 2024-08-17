@@ -63,4 +63,4 @@ fi
 # install app
 gcloud secrets versions access latest --secret=ansible-vault > ansible_vlt_pwd
 ansible-playbook --vault-password-file ansible_vlt_pwd -i gcpinv.ini immotep.yml
-# rm ansible_vlt_pwd
+rm ansible_vlt_pwd
