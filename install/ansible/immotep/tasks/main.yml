@@ -16,6 +16,9 @@
   ansible.builtin.apt:
     name:
       - postgresql
+      - postgresql-16-postgis-3
+      - postgis
+      - postgresql-16-pgrouting
       - python3-psycopg2 # lib used by ansible tasks for postgresql operation
       - acl # needed to run task as postgres user
     state: present
@@ -41,6 +44,22 @@
     owner: immotep
     login_host: localhost
     login_unix_socket: /var/run/postgresql
+
+- name: Add postgis extension
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_ext:
+    name: postgis
+    db: immdb
+
+- name: Add pgrouting extension
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_ext:
+    name: pgrouting
+    db: immdb
 
 # Create immotep user
 - name: Create immotep group

@@ -47,3 +47,29 @@ gcsfuse version 0.41.12 (Go version go1.18.4)
 Mount bucket
 mkdir ${HOME}/data
 alias s3mount='gcsfuse im-test-storage ${HOME}/data'
+
+
+# query to fill postgis column
+
+WITH rsubquery AS (SELECT code, ST_GeomFromGeoJSON(contour::json->>'geometry') as imp FROM regions)
+UPDATE regions
+SET geom=rsubquery.imp
+FROM rsubquery
+WHERE regions.code=rsubquery.code;
+
+WITH csubquery AS (SELECT code, ST_GeomFromGeoJSON(contour::json->>'geometry') as imp FROM cities)
+UPDATE cities
+SET geom=csubquery.imp
+FROM csubquery
+WHERE cities.code=csubquery.code;
+
+WITH dsubquery AS (SELECT code, ST_GeomFromGeoJSON(contour::json->>'geometry') as imp FROM departments)
+UPDATE departments
+SET geom=dsubquery.imp
+FROM dsubquery
+WHERE departments.code=dsubquery.code;
+
+# select in bbox
+
+SELECT name, zip_code, ST_AsText(ST_Boundary(geom)) FROM cities
+WHERE ST_MakeEnvelope(4.8, 45, 4.9, 46, 4326) && geom ;

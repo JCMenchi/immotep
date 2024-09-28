@@ -1,3 +1,4 @@
 /raw/
 /clean/
 *.db
+install/ansible/ansible_vlt_pwd
