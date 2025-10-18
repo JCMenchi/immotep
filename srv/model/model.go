@@ -170,9 +170,9 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 
 	whereClause := fmt.Sprintf("lat < %v AND lat > %v AND long < %v AND long > %v", NElat, SWlat, NELong, SWLong)
 
-	if dep != "" {
+	/*if dep != "" {
 		whereClause = fmt.Sprintf("%v AND department_code = '%v'", whereClause, dep)
-	}
+	}*/
 
 	if year > 0 {
 		whereClause = fmt.Sprintf("%v AND date >= '%v-01-01' AND date < '%v-01-01'", whereClause, year, year+1)
@@ -186,7 +186,7 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 		limit = 500
 	}
 
-	result := db.Where(whereClause).Limit(limit).Find(&info.Trans)
+	result := db.Where(whereClause).Order("date DESC").Limit(limit).Find(&info.Trans)
 
 	if result.Error != nil {
 		log.Errorf("GetPOIFromBounds err: %v\n", result.Error)
@@ -243,7 +243,7 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 		query = db.Limit(100)
 	}
 
-	result := query.Find(&cities)
+	result := query.Select("code, name, zip_code, population, contour, avg_price, ST_AsBinary(geom) as geom").Find(&cities)
 
 	if result.Error != nil {
 		log.Errorf("GetRegionDetails err: %v\n", result.Error)
@@ -308,7 +308,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 
 	var regs []Region
 
-	result := db.Find(&regs)
+	result := db.Select("code, name, contour, avg_price, ST_AsBinary(geom) as geom").Find(&regs)
 
 	if result.Error != nil {
 		log.Errorf("GetRegionDetails err: %v\n", result.Error)
@@ -369,7 +369,7 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 
 	var deps []Department
 
-	result := db.Find(&deps)
+	result := db.Select("code, name, code_region, contour, avg_price, ST_AsBinary(geom) as geom").Find(&deps)
 
 	if result.Error != nil {
 		log.Errorf("GetDepartmentDetails err: %v\n", result.Error)
