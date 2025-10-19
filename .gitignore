@@ -2,10 +2,6 @@
 /clean/
 *.db
 install/ansible/ansible_vlt_pwd
-ui/.idea/.gitignore
-ui/.idea/modules.xml
-ui/.idea/rcb-settings.xml
-ui/.idea/ui.iml
-ui/.idea/vcs.xml
-ui/.idea/inspectionProfiles/Project_Default.xml
+ui/.idea
 ui/stats.json
+ui/dist
