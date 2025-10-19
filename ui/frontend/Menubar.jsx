@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+// ui/frontend/Menubar.jsx
+
+// React hooks
+import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 
+// MUI components
 import { Button, Grid, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
 import { Brightness7, Brightness4, LocationOnSharp } from '@mui/icons-material';
 
+// redux actions and selectors
 import {
     selectUITheme,
     changeUITheme,
@@ -17,8 +22,33 @@ import {
     selectAvgPriceSQM,
     selectYear
 } from './store/uiparamSlice';
+
+// service for API calls
 import service from './poi_service';
 
+/**
+ * Menubar component provides navigation and control bar for real estate data visualization.
+ * 
+ * @component
+ * @description
+ * Displays average property prices, provides address search with geocoding,
+ * year filtering (2016-2023), department filtering, query limit control,
+ * UI theme toggle and geolocation finder.
+ * 
+ * Uses Redux for state management with the following global states:
+ * - limit: Maximum number of query results
+ * - department: Selected department code
+ * - avgprice: Average property price
+ * - avgpriceSQM: Average price per square meter
+ * - year: Selected year filter
+ * - UITheme: Current UI theme ('light' or 'dark')
+ * 
+ * @example
+ * ```jsx
+ * <Menubar />
+ * ```
+ * @returns {JSX.Element} A Material-UI Grid container with navigation controls
+ */
 export default function Menubar() {
     // state from redux global store
     const limit = useSelector(selectQueryLimit);
@@ -32,6 +62,9 @@ export default function Menubar() {
 
     const UITheme = useSelector(selectUITheme);
 
+    /**
+     * Toggles between light and dark UI themes
+     */
     const toggleUITheme = () => {
         if (UITheme === 'dark') {
             dispatch(changeUITheme('light'));
@@ -40,6 +73,9 @@ export default function Menubar() {
         }
     };
 
+    /**
+     * Uses browser geolocation API to set user's current position
+     */
     const findMe = () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
@@ -49,11 +85,18 @@ export default function Menubar() {
         
     }
 
+    // Local state declarations
     const [ currentLimit, setCurrentLimit ] = useState(limit);
     const [ currentDep, setCurrentDep ] = useState(department);
     const [ currentYear, setYear ] = useState(year);
     const [ currentAddress, setCurrentAddress ] = useState("");
     
+    /**
+     * Geocodes an address string using the French government's API
+     * and updates the position accordingly
+     * 
+     * @param {string} addr - The address to geocode
+     */
     const loadAddress = (addr) => {
         console.log(addr)
         const baseURL = "https://api-adresse.data.gouv.fr/search/?q=" + addr
@@ -97,7 +140,9 @@ export default function Menubar() {
                     }}
                     disabled={false}
                     variant='outlined'
-                    inputProps={{ style: { textAlign: 'right' } }}
+                    slotProps={{
+                        htmlInput: { style: { textAlign: 'left' } }
+                    }}
                 />
             </Grid>
 
@@ -144,7 +189,7 @@ export default function Menubar() {
                     onChange={(event) => {
                         setCurrentDep(event.target.value);
                     }}
-                    onBlur={(event) => {
+                    onBlur={() => {
                         dispatch(changeQueryDepartment(currentDep));
                     }}
                     onKeyUp={(event) => {

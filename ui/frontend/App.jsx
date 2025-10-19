@@ -25,9 +25,8 @@ const lightTheme = createTheme({
 /**
  * Main Application Component
  * 
- * @param {Object} props 
  */
-export default function App(props) {
+export default function App() {
 
   // local state
   const position = useSelector(selectCenterPosition);

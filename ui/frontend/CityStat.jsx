@@ -73,7 +73,9 @@ export const CityStat = () => {
     useEffect(() => {
         service.get("api/cities?limit=600&dep=" + department)
             .then((response) => {
-                setCityInfos(response.data);
+                if (Array.isArray(response.data)) {
+                    setCityInfos(response.data);
+                }
             }).catch((error) => {
                 console.error('Failed to load city info:', error);
             });
@@ -85,7 +87,7 @@ export const CityStat = () => {
                 <GeoJSON key={item.name} data={item.contour} style={computeCityContourStyle}>
                     <Tooltip>
                         {`(${item.zip}) ${item.name}: ${item.avgprice.toFixed(0)}€`}<br /> {`Population: ${item.population}`}<br /> 
-                        { item.stat && Object.keys(item.stat).map((k,i) => {
+                        { item.stat && Object.keys(item.stat).map((k) => {
                                 return (
                                     <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
                                 )

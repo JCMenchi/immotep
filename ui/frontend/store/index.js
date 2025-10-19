@@ -2,7 +2,6 @@
 import { configureStore, combineReducers, Tuple } from '@reduxjs/toolkit';
 
 // REDUX middleware
-import logger from "redux-logger";
 import {thunk} from "redux-thunk";
 
 // my REDUX reducer
@@ -12,10 +11,14 @@ const reducers = combineReducers({
   uiParam: uiParam.reducer
 })
 
+/*
+import logger from "redux-logger";
+
 const middlewareList = [thunk];
-/*if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production') {
   middlewareList.push(logger);
-}*/
+}
+*/
 
 export const store = configureStore({
   reducer: reducers,

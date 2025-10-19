@@ -23,7 +23,9 @@ export const RegionStat = () => {
     useEffect(() => {
         service.get("api/regions")
             .then((response) => {
-                setRegionInfos(response.data);
+                if (Array.isArray(response.data)) {
+                    setRegionInfos(response.data);
+                }
             }).catch((error) => {
                 console.error('Failed to load Region info:', error);
             });
@@ -35,7 +37,7 @@ export const RegionStat = () => {
                 <GeoJSON key={item.name} data={item.contour} style={computeRegionContourStyle}>
                     <Tooltip>
                         {`(${item.code}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
-                        { item.stat && Object.keys(item.stat).map((k,i) => {
+                        { item.stat && Object.keys(item.stat).map((k) => {
                                 return (
                                     <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
                                 )

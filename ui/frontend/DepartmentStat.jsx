@@ -24,7 +24,9 @@ export const DepartmentStat = () => {
     useEffect(() => {
         service.get("api/departments")
             .then((response) => {
-                setDepartmentInfos(response.data);
+                if (Array.isArray(response.data)) {
+                    setDepartmentInfos(response.data);
+                }
             }).catch((error) => {
                 console.error('Failed to load Department info:', error);
             });
@@ -36,7 +38,7 @@ export const DepartmentStat = () => {
                 <GeoJSON key={item.name} data={item.contour} style={computeDepartmentContourStyle}>
                     <Tooltip>
                         {`(${item.code}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
-                        { item.stat && Object.keys(item.stat).map((k,i) => {
+                        { item.stat && Object.keys(item.stat).map((k) => {
                                 return (
                                     <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
                                 )

@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import { Suspense } from "react";
 import { Provider } from 'react-redux';
 import { createRoot } from 'react-dom/client';
 
