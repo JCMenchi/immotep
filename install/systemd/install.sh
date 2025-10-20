@@ -25,6 +25,9 @@ su postgres -c "psql -dpostgres -c \"CREATE USER immotep WITH PASSWORD 'imm.pwd1
 su postgres -c "psql -dpostgres -c \"CREATE DATABASE immdb WITH OWNER = 'immotep'\" "
 su postgres -c "psql -dpostgres -c \"GRANT ALL PRIVILEGES ON DATABASE immdb to immotep;\" "
 
+su postgres -c "psql -dpostgres -c \"ALTER DATABASE immdb SET search_path=public,postgis,contrib;\" "
+su postgres -c "psql -dimmdb -c \"CREATE EXTENSION postgis;\" "
+su postgres -c "psql -dimmdb -c \"CREATE EXTENSION pgrouting;\" "
 
 systemctl enable immotep.service
 systemctl start immotep.service

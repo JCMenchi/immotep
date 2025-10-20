@@ -95,11 +95,46 @@ export default function Menubar() {
      * Geocodes an address string using the French government's API
      * and updates the position accordingly
      * 
+     * {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        -2.316402,
+                        48.21157
+                    ]
+                },
+                "properties": {
+                    "label": "1 La Ville Allain 22230 Trémorel",
+                    "score": 0.9434745454545453,
+                    "housenumber": "1",
+                    "id": "22371_d415_00001",
+                    "banId": "bdaa9e02-7eec-496e-8375-cf6aece94acf",
+                    "name": "1 La Ville Allain",
+                    "postcode": "22230",
+                    "citycode": "22371",
+                    "x": 305386.22,
+                    "y": 6803424.77,
+                    "city": "Trémorel",
+                    "context": "22, Côtes-d'Armor, Bretagne",
+                    "type": "housenumber",
+                    "importance": 0.37822,
+                    "street": "La Ville Allain",
+                    "_type": "address"
+                }
+            }
+        ],
+        "query": "1 la ville allain tremorel"
+    }
+     * 
      * @param {string} addr - The address to geocode
      */
     const loadAddress = (addr) => {
         console.log(addr)
-        const baseURL = "https://api-adresse.data.gouv.fr/search/?q=" + addr
+        const baseURL = "https://data.geopf.fr/geocodage/search/?q=" + addr
 
         service.get(baseURL)
         .then((response) => {
@@ -176,6 +211,8 @@ export default function Menubar() {
                         <MenuItem value={2021}>2021</MenuItem>
                         <MenuItem value={2022}>2022</MenuItem>
                         <MenuItem value={2023}>2023</MenuItem>
+                        <MenuItem value={2024}>2024</MenuItem>
+                        <MenuItem value={2025}>2025</MenuItem>
                     </Select>
                </FormControl>
             </Grid>

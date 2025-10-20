@@ -75,14 +75,31 @@ type GeoCodeInfo struct {
 	Features    []GeoFeature `json:"features"`
 }
 
-func GeocodeDB(dsn string, depcode string) {
+const LAT_INDEX = 4
+const LONG_INDEX = 3
+const ADDRESS_INDEX = 7
+const ZIPCODE_INDEX = 13
+const CITYNAME_INDEX = 14
+const CITYCODE_INDEX = 16
+const STATUS_INDEX = 20
+
+func GeocodeDB(dsn string, incremental bool, depcode string) {
 
 	db := model.ConnectToDB(dsn)
 
 	// build query
-	query := db.Where("lat = 0")
-	if depcode != "" {
-		query = db.Where("lat = 0 AND department_code = ?", depcode)
+	query := db.Model(&model.Transaction{})
+
+	if incremental {
+		if depcode != "" {
+			query = db.Where("lat = 0 AND department_code = ?", depcode)
+		} else {
+			query = db.Where("lat = 0")
+		}
+	} else {
+		if depcode != "" {
+			query = db.Where("department_code = ?", depcode)
+		}
 	}
 
 	// nb elt
@@ -111,12 +128,12 @@ func GeocodeDB(dsn string, depcode string) {
 
 		// create CSV data in memory
 		b := new(strings.Builder)
-		b.WriteString("trid,Address,ZipCode,City\n")
+		b.WriteString("trid,Address,ZipCode\n")
 
 		for _, item := range trans {
 			bar.Increment()
 			if item.TrId != 0 {
-				b.WriteString(fmt.Sprintf("%v,%v,%v,%v\n", item.TrId, item.Address, item.ZipCode, item.City))
+				b.WriteString(fmt.Sprintf("%v,%v %v,%v\n", item.TrId, item.Address, item.City, item.ZipCode))
 			} else {
 				log.Debugf("Bad item: %v\n", item)
 			}
@@ -129,9 +146,11 @@ func GeocodeDB(dsn string, depcode string) {
 		}
 
 		// skip header
-		_, err = csvread.Read()
+		row, err := csvread.Read()
 		if err != nil {
 			return nil
+		} else {
+			log.Debugf("GeocodeDB CSV Header: %v\n", row)
 		}
 
 		// parse result
@@ -148,14 +167,15 @@ func GeocodeDB(dsn string, depcode string) {
 
 				trid, _ := strconv.Atoi(row[0])
 
-				lat, errlat := strconv.ParseFloat(row[4], 64)
-				long, errlong := strconv.ParseFloat(row[5], 64)
+				lat, errlat := strconv.ParseFloat(row[LAT_INDEX], 64)
+				long, errlong := strconv.ParseFloat(row[LONG_INDEX], 64)
 
-				if errlat != nil || errlong != nil {
-					log.Debugf("GeocodeDB No coord: (%v, %v)  %v\n", row[4], row[5], row)
+				if errlat != nil || errlong != nil || (lat == 0 && long == 0) {
+					log.Debugf("GeocodeDB No coord: (%v, %v)  %v\n", row[LAT_INDEX], row[LONG_INDEX], row)
 					nbError++
 				} else {
-					tr2update = append(tr2update, map[string]interface{}{"tr_id": trid, "lat": lat, "long": long})
+					tr2update = append(tr2update, map[string]interface{}{"tr_id": trid, "address": row[ADDRESS_INDEX],
+						"zip_code": row[ZIPCODE_INDEX], "city": row[CITYNAME_INDEX], "city_code": row[CITYCODE_INDEX], "lat": lat, "long": long})
 				}
 			} else {
 				log.Debugf("Cannot geocode: %v\n", row)
@@ -167,7 +187,7 @@ func GeocodeDB(dsn string, depcode string) {
 			// bulk update
 			updresult := db.Clauses(clause.OnConflict{
 				Columns:   []clause.Column{{Name: "tr_id"}},
-				DoUpdates: clause.AssignmentColumns([]string{"lat", "long"}),
+				DoUpdates: clause.AssignmentColumns([]string{"address", "city", "zip_code", "lat", "long"}),
 			}).Table("transactions").Create(&tr2update)
 
 			if updresult.Error != nil {
@@ -192,7 +212,7 @@ func GeocodeDB(dsn string, depcode string) {
 	log.Infof("GeocodeDB: %v elt %v processed %v err.\n", count, nbprocessed, nbError)
 }
 
-var baseURL string = "https://api-adresse.data.gouv.fr/search/csv"
+var baseURL string = "https://data.geopf.fr/geocodage/search/csv"
 
 func getGPSCoord(csvdata string) (*csv.Reader, error) {
 
@@ -201,7 +221,7 @@ func getGPSCoord(csvdata string) (*csv.Reader, error) {
 	w := multipart.NewWriter(requestBody)
 	// specify columns to use
 	w.WriteField("columns", "Address")
-	w.WriteField("postcode", "ZipCode")
+	//w.WriteField("postcode", "ZipCode")
 	// add data file
 	datapart, _ := w.CreateFormFile("data", "address.csv")
 	// copy csv data it to its part

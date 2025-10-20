@@ -7,7 +7,6 @@ import (
 
 	geojson "github.com/paulmach/go.geojson"
 	log "github.com/sirupsen/logrus"
-	"github.com/twpayne/go-geom/encoding/wkb"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -39,21 +38,21 @@ type Transaction struct {
 }
 
 type Region struct {
-	Code     string   `gorm:"primaryKey" json:"code"`
-	Name     string   `json:"nom"`
-	Contour  string   `json:"contour"`
-	AvgPrice float64  `json:"avg_price"`
-	City     []City   `gorm:"foreignKey:CodeRegion;references:Code"`
-	Geom     wkb.Geom `gorm:"type:geometry"`
+	Code     string  `gorm:"primaryKey" json:"code"`
+	Name     string  `json:"nom"`
+	Contour  string  `json:"contour"`
+	AvgPrice float64 `json:"avg_price"`
+	City     []City  `gorm:"foreignKey:CodeRegion;references:Code"`
+	//Geom     wkb.Geom `gorm:"type:geometry"`
 }
 
 type Department struct {
-	Code     string   `gorm:"primaryKey" json:"code"`
-	Name     string   `json:"nom"`
-	Contour  string   `json:"contour"`
-	AvgPrice float64  `json:"avg_price"`
-	City     []City   `gorm:"foreignKey:CodeDepartment;references:Code"`
-	Geom     wkb.Geom `gorm:"type:geometry"`
+	Code     string  `gorm:"primaryKey" json:"code"`
+	Name     string  `json:"nom"`
+	Contour  string  `json:"contour"`
+	AvgPrice float64 `json:"avg_price"`
+	City     []City  `gorm:"foreignKey:CodeDepartment;references:Code"`
+	//Geom     wkb.Geom `gorm:"type:geometry"`
 }
 
 type City struct {
@@ -67,7 +66,7 @@ type City struct {
 	CodeRegion     string   `json:"codeRegion"`
 	AvgPrice       float64  `json:"avg_price"`
 	CodesPostaux   []string `gorm:"-" json:"codesPostaux"`
-	Geom           wkb.Geom `gorm:"type:geometry"`
+	//Geom           wkb.Geom `gorm:"type:geometry"`
 }
 
 func ConnectToDB(dsn string) *gorm.DB {
@@ -170,9 +169,9 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 
 	whereClause := fmt.Sprintf("lat < %v AND lat > %v AND long < %v AND long > %v", NElat, SWlat, NELong, SWLong)
 
-	/*if dep != "" {
+	if dep != "" {
 		whereClause = fmt.Sprintf("%v AND department_code = '%v'", whereClause, dep)
-	}*/
+	}
 
 	if year > 0 {
 		whereClause = fmt.Sprintf("%v AND date >= '%v-01-01' AND date < '%v-01-01'", whereClause, year, year+1)

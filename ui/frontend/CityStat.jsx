@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 
 import { GeoJSON, Tooltip } from "react-leaflet";
 import service from './poi_service'
@@ -8,7 +8,11 @@ import { getColorFromPrice } from "./maputils";
 import { useMapEvents } from "react-leaflet";
 
 import {
-    selectQueryDepartment
+    changeAvgPrice,
+    changeAvgPriceSQM,
+    selectQueryDepartment,
+    selectQueryLimit,
+    selectYear
 } from './store/uiparamSlice';
 
 function computeCityContourStyle(feature) {
@@ -27,8 +31,14 @@ export const CityStat = () => {
 
     // state from redux global store
     const department = useSelector(selectQueryDepartment);
+    const limit = useSelector(selectQueryLimit);
+    const year = useSelector(selectYear);
 
     const [cityInfos, setCityInfos] = useState(null)
+    const [transactions, setTransactions] = useState(null)
+
+    // get reducer dispatcher
+    const dispatch = useDispatch();
 
     const map = useMapEvents({
         moveend(_event) {

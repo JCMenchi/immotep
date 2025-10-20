@@ -2,6 +2,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
             "name": "Launch Chrome",
             "request": "launch",
@@ -25,7 +26,7 @@
             "request": "launch",
             "mode": "auto",
             "cwd": "${workspaceFolder}/srv",
-            "args": ["geocode"],
+            "args": ["geocode", "35"],
             "program": "${workspaceFolder}/srv/main.go",
             "debugAdapter": "dlv-dap"
         }

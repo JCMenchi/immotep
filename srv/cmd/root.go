@@ -215,10 +215,10 @@ var geocodeCmd = &cobra.Command{
 		if len(args) > 0 {
 			for _, a := range args {
 				log.Infof("geocode dep: %v\n", a)
-				loader.GeocodeDB(dsn, a)
+				loader.GeocodeDB(dsn, false, a)
 			}
 		} else {
-			loader.GeocodeDB(dsn, "")
+			loader.GeocodeDB(dsn, true, "")
 		}
 	},
 }
