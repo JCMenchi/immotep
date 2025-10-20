@@ -116,8 +116,8 @@ func GeocodeDB(dsn string, incremental bool, depcode string) {
 
 	// batch size 5000
 	var batchSize int = int(count / 100)
-	if batchSize > 5000 {
-		batchSize = 5000
+	if batchSize > 10000 {
+		batchSize = 10000
 	} else if batchSize == 0 {
 		batchSize = 100
 	}

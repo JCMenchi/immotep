@@ -35,7 +35,7 @@ export const CityStat = () => {
     const year = useSelector(selectYear);
 
     const [cityInfos, setCityInfos] = useState(null)
-    const [transactions, setTransactions] = useState(null)
+    const [_, setTransactions] = useState(null)
 
     // get reducer dispatcher
     const dispatch = useDispatch();

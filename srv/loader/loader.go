@@ -654,32 +654,6 @@ func getCityContour(cityCode string, communesgeo geojson.FeatureCollection) (str
 	return "", errors.New("no contour found")
 }
 
-func getDepartementCodeRegion(dsn string, codeDep string) string {
-	db := model.ConnectToDB(dsn)
-
-	// build query
-	rows, err := db.Select("DISTINCT(code_department) as dep, code_region as region").
-		Where("code_department = ?", codeDep).
-		Table("cities").
-		Rows()
-
-	if err != nil {
-		log.Errorf("getDepartementCodeRegion err: %v\n", err)
-		return ""
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var dep, region string
-
-		rows.Scan(&dep, &region)
-
-		return region
-	}
-
-	return ""
-}
-
 func getZipCodeFromCityCode(dsn string, codeCity string, name string) int {
 	db := model.ConnectToDB(dsn)
 
