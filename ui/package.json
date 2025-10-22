@@ -8,20 +8,26 @@
     "dev": "vite",
     "build": "vite build",
     "doc": "jsdoc -R README.md -P package.json -d doc -r -c jsdoc.config.json frontend",
-    "test": "jest --passWithNoTests",
-    "test:watch": "npm test -- --watch",
-    "coverage": "jest --passWithNoTests --coverage"
+    "test": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.8.1",
     "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "happy-dom": "^20.0.7",
+    "jsdom": "^27.0.1",
+    "msw": "^2.11.6",
     "oxlint": "^1.16.0",
     "rimraf": "^6.0.1",
     "vite": "^6.4.0",
     "vite-plugin-oxlint": "^1.4.0",
-    "msw": "^2.11.6",
     "vitest": "^3.2.4"
   },
   "dependencies": {
@@ -52,37 +58,6 @@
     "redux-logger": "^3.0.6",
     "regenerator-runtime": "^0.14.1",
     "yargs": "^17.7.2"
-  },
-  "jest": {
-    "globals": {
-      "__JEST__": true
-    },
-    "moduleNameMapper": {
-      "\\.css$": "identity-obj-proxy",
-      "fontsource-roboto$": "identity-obj-proxy",
-      "\\-worker.js$": "<rootDir>/__mocks__/webpack-worker.js",
-      "jspdf.*\\.js": "<rootDir>/__mocks__/webpack-worker.js"
-    },
-    "reporters": [
-      "default",
-      [
-        "./node_modules/jest-html-reporter",
-        {
-          "pageTitle": "Test Report"
-        }
-      ]
-    ],
-    "collectCoverage": false,
-    "collectCoverageFrom": [
-      "**/src/**/*.{js,jsx}"
-    ],
-    "coverageDirectory": "coverage",
-    "coverageReporters": [
-      "lcov",
-      "html",
-      "text",
-      "text-summary"
-    ]
   },
   "browserslist": {
     "production": [

@@ -15,8 +15,13 @@ import {
     selectYear
 } from './store/uiparamSlice';
 
-function computeCityContourStyle(feature) {
-    const color = getColorFromPrice(feature.properties.avgprice);
+export function computeCityContourStyle(feature) {
+    let color = "grey";
+
+    if (feature && feature.properties && feature.properties.avgprice) {
+        color = getColorFromPrice(feature.properties.avgprice);
+    }
+
     return {
         fillColor: color,
         weight: 1,
@@ -47,15 +52,15 @@ export const CityStat = () => {
                 southWest: map.getBounds()._southWest,
                 code: department
             }
-            
+
             // need to reload data with new bounds
             service.get("api/cities?limit=600&dep=" + department)
-            .then((response) => {
-                setCityInfos(response.data);
-            }).catch((error) => {
-                console.error('Failed to load city info:', error);
-            });
-            
+                .then((response) => {
+                    setCityInfos(response.data);
+                }).catch((error) => {
+                    console.error('Failed to load city info:', error);
+                });
+
             service.post("api/pois/filter?limit=" + limit + "&year=" + year, bounds)
                 .then((response) => {
                     const tr = response.data;
@@ -96,12 +101,12 @@ export const CityStat = () => {
             {cityInfos && cityInfos.map(item => (
                 <GeoJSON key={item.name} data={item.contour} style={computeCityContourStyle}>
                     <Tooltip>
-                        {`(${item.zip}) ${item.name}: ${item.avgprice.toFixed(0)}€`}<br /> {`Population: ${item.population}`}<br /> 
-                        { item.stat && Object.keys(item.stat).map((k) => {
-                                return (
-                                    <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
-                                )
-                            })
+                        {`(${item.zip}) ${item.name}: ${item.avgprice.toFixed(0)}€`}<br /> {`Population: ${item.population}`}<br />
+                        {item.stat && Object.keys(item.stat).map((k) => {
+                            return (
+                                <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
+                            )
+                        })
                         }
                     </Tooltip>
                 </GeoJSON>

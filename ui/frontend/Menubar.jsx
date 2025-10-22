@@ -152,14 +152,14 @@ export default function Menubar() {
     return (
 
         <Grid container spacing={1} direction='row' alignItems='center' style={{ paddingTop: 8, paddingBottom: 8 }}>
-            <Grid item style={{ flexGrow: 0 }}>
+            <Grid style={{ flexGrow: 0 }}>
                 <Typography variant='h5'>
                     {avgprice > 0 && `Prix Moyen: ${avgprice.toFixed(0)} € `}
                     {avgpriceSQM > 0 && ` ${avgpriceSQM.toFixed(0)} €/m² `}
                 </Typography>
             </Grid>
 
-            <Grid item style={{ flexGrow: 1 }}>
+            <Grid style={{ flexGrow: 1 }}>
                 <TextField
                     fullWidth
                     type='text'
@@ -181,13 +181,13 @@ export default function Menubar() {
                 />
             </Grid>
 
-            <Grid item style={{ flexGrow: 0 }}>
+            <Grid style={{ flexGrow: 0 }}>
                 <Button variant="outlined" onClick={() => {loadAddress(currentAddress);}}>
                    Go
                 </Button>
             </Grid>
 
-            <Grid item style={{ flexGrow: 0 }}>
+            <Grid style={{ flexGrow: 0 }}>
                 <FormControl>
                     <InputLabel size="small" id="select-year-label">Year</InputLabel>
                     <Select
@@ -217,7 +217,7 @@ export default function Menubar() {
                </FormControl>
             </Grid>
 
-            <Grid item style={{ flexGrow: 0 }}>
+            <Grid style={{ flexGrow: 0 }}>
                 <TextField
                     type='text'
                     label={"Departement"}
@@ -240,7 +240,7 @@ export default function Menubar() {
                 />
             </Grid>
             
-            <Grid item style={{ flexGrow: 0 }}>
+            <Grid style={{ flexGrow: 0 }}>
                 <TextField
                     type='number'
                     label={"Limit"}
@@ -260,8 +260,8 @@ export default function Menubar() {
                 />
             </Grid>
            
-            <Grid item >
-                <IconButton size="small" onClick={() => toggleUITheme()} >
+            <Grid>
+                <IconButton id="change-theme-button" size="small" onClick={() => toggleUITheme()} >
                   {UITheme === 'dark' ? <Brightness4 /> : <Brightness7 />}
                 </IconButton>
                 <IconButton size="small" onClick={() => findMe()} >

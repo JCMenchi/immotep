@@ -4,8 +4,13 @@ import { GeoJSON, Tooltip } from "react-leaflet";
 import service from './poi_service'
 import { getColorFromPrice } from "./maputils";
 
-function computeRegionContourStyle(feature) {
-    const color = getColorFromPrice(feature.properties.avgprice);
+export function computeRegionContourStyle(feature) {
+    let color = "grey";
+
+    if (feature && feature.properties && feature.properties.avgprice) {
+        color = getColorFromPrice(feature.properties.avgprice);
+    }
+
     return {
         fillColor: color,
         weight: 1,
@@ -37,11 +42,11 @@ export const RegionStat = () => {
                 <GeoJSON key={item.name} data={item.contour} style={computeRegionContourStyle}>
                     <Tooltip>
                         {`(${item.code}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
-                        { item.stat && Object.keys(item.stat).map((k) => {
-                                return (
-                                    <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
-                                )
-                            })
+                        {item.stat && Object.keys(item.stat).map((k) => {
+                            return (
+                                <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
+                            )
+                        })
                         }
                     </Tooltip>
                 </GeoJSON>

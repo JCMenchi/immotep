@@ -5,3 +5,4 @@ install/ansible/ansible_vlt_pwd
 ui/.idea
 ui/stats.json
 ui/dist
+ui/coverage/
