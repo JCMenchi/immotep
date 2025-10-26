@@ -86,13 +86,6 @@ func ConnectToDB(dsn string) *gorm.DB {
 			return nil
 		}
 
-		// Update Geometry
-		text := "WITH csubquery AS (SELECT code, ST_GeomFromGeoJSON(contour::json->>'geometry') as imp FROM cities) UPDATE cities SET geom=csubquery.imp FROM csubquery WHERE cities.code=csubquery.code;"
-		res := db.Exec(text)
-		if res.Error != nil {
-			log.Errorf("Update Geometry error: %v\n", res.Error)
-			return nil
-		}
 		return db
 	} else if strings.HasPrefix(dsn, "file:") {
 		sl := sqlite.Open(dsn)

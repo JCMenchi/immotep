@@ -600,7 +600,7 @@ func LoadCity(dsn string, filename string, geofilename string) error {
 			} else {
 				cityBatch = append(cityBatch, city)
 				if len(cityBatch) == batchSize {
-					result := db.Create(&cityBatch)
+					result := db.Omit("Geom").Create(&cityBatch)
 					if result.Error != nil {
 						log.Errorf("Error: %v\n", result.Error)
 					}
@@ -611,13 +611,23 @@ func LoadCity(dsn string, filename string, geofilename string) error {
 	}
 
 	if len(cityBatch) > 0 {
-		result := db.CreateInBatches(&cityBatch, 50)
+		result := db.Omit("Geom").CreateInBatches(&cityBatch, 50)
 		if result.Error != nil {
 			log.Errorf("Error: %v\n", result.Error)
 		}
 	}
 
 	bar.Finish()
+
+	// Update Geometry
+	log.Infof("Update city postgis column...\n")
+	text := "WITH csubquery AS (SELECT code, ST_GeomFromGeoJSON(contour::json->>'geometry') as imp FROM cities) UPDATE cities SET geom=csubquery.imp FROM csubquery WHERE cities.code=csubquery.code;"
+	res := db.Exec(text)
+	if res.Error != nil {
+		log.Errorf("Update Geometry error: %v\n", res.Error)
+		return nil
+	}
+
 	log.Infof("...city loaded.\n")
 
 	return nil
