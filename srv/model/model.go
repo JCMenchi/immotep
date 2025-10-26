@@ -7,6 +7,8 @@ import (
 
 	geojson "github.com/paulmach/go.geojson"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/twpayne/go-geom/encoding/wkb"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -43,7 +45,6 @@ type Region struct {
 	Contour  string  `json:"contour"`
 	AvgPrice float64 `json:"avg_price"`
 	City     []City  `gorm:"foreignKey:CodeRegion;references:Code"`
-	//Geom     wkb.Geom `gorm:"type:geometry"`
 }
 
 type Department struct {
@@ -52,7 +53,6 @@ type Department struct {
 	Contour  string  `json:"contour"`
 	AvgPrice float64 `json:"avg_price"`
 	City     []City  `gorm:"foreignKey:CodeDepartment;references:Code"`
-	//Geom     wkb.Geom `gorm:"type:geometry"`
 }
 
 type City struct {
@@ -66,7 +66,7 @@ type City struct {
 	CodeRegion     string   `json:"codeRegion"`
 	AvgPrice       float64  `json:"avg_price"`
 	CodesPostaux   []string `gorm:"-" json:"codesPostaux"`
-	//Geom           wkb.Geom `gorm:"type:geometry"`
+	Geom           wkb.Geom `gorm:"type:geometry"`
 }
 
 func ConnectToDB(dsn string) *gorm.DB {
@@ -86,6 +86,13 @@ func ConnectToDB(dsn string) *gorm.DB {
 			return nil
 		}
 
+		// Update Geometry
+		text := "WITH csubquery AS (SELECT code, ST_GeomFromGeoJSON(contour::json->>'geometry') as imp FROM cities) UPDATE cities SET geom=csubquery.imp FROM csubquery WHERE cities.code=csubquery.code;"
+		res := db.Exec(text)
+		if res.Error != nil {
+			log.Errorf("Update Geometry error: %v\n", res.Error)
+			return nil
+		}
 		return db
 	} else if strings.HasPrefix(dsn, "file:") {
 		sl := sqlite.Open(dsn)
@@ -242,10 +249,10 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 		query = db.Limit(100)
 	}
 
-	result := query.Select("code, name, zip_code, population, contour, avg_price, ST_AsBinary(geom) as geom").Find(&cities)
+	result := query.Select("code, name, zip_code, population, contour, avg_price").Find(&cities)
 
 	if result.Error != nil {
-		log.Errorf("GetRegionDetails err: %v\n", result.Error)
+		log.Errorf("GetCityDetails err: %v\n", result.Error)
 		return nil
 	}
 
@@ -275,6 +282,80 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 	}
 
 	return cityinfos
+}
+
+type BoundedCityInfo struct {
+	Cities      []CityInfo `json:"cities"`
+	AvgPrice    float64    `json:"avgprice"`
+	AvgPriceSQM float64    `json:"avgprice_sqm"`
+}
+
+func GetCitiesFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int) *BoundedCityInfo {
+
+	var info BoundedCityInfo
+	var cities []City
+
+	whereClause := fmt.Sprintf("ST_Intersects(ST_AsBinary(geom), ST_MakeEnvelope(%v, %v, %v, %v))", SWLong, SWlat, NELong, NElat)
+
+	if limit <= 0 {
+		limit = 100
+	} else if limit > 1000 {
+		limit = 500
+	}
+
+	result := db.Where(whereClause).Limit(limit).Select("code, name, zip_code, population, contour, avg_price").Find(&cities)
+
+	if result.Error != nil {
+		log.Errorf("GetCitiesFromBounds err: %v\n", result.Error)
+		return nil
+	}
+
+	info.Cities = make([]CityInfo, 0, len(cities))
+
+	for _, c := range cities {
+		var current CityInfo
+		current.Name = c.Name
+		current.Code = c.Code
+		current.ZipCode = c.ZipCode
+		current.AvgPriceSQM = c.AvgPrice
+		current.Population = c.Population
+
+		feat, err := geojson.UnmarshalFeature([]byte(c.Contour))
+		if err != nil {
+			log.Errorf("GetCityDetails UnmarshalGeometry err: %v\n", err)
+		} else {
+			current.Contour = feat
+			current.Contour.SetProperty("avgprice", c.AvgPrice)
+			current.Contour.SetProperty("city", c.Code)
+			current.Contour.SetProperty("population", c.Population)
+
+			current.Stat = getCityStat(db, c.Code)
+
+			info.Cities = append(info.Cities, current)
+		}
+	}
+
+	rows, err := db.Debug().Select("AVG(transactions.price) as avg_price, AVG(transactions.price_psqm) as avg_price_psqm").
+		Where("lat < ? AND lat > ? AND long < ? AND long > ?", NElat, SWlat, NELong, SWLong).
+		Table("transactions").
+		Rows()
+
+	if err != nil {
+		log.Errorf("GetCitiesFromBounds err: %v\n", err)
+		return nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var avg_price, avg_price_psqm float64
+
+		rows.Scan(&avg_price, &avg_price_psqm)
+
+		info.AvgPrice = avg_price
+		info.AvgPriceSQM = avg_price_psqm
+	}
+
+	return &info
 }
 
 func getCityStat(db *gorm.DB, s string) map[int]string {
@@ -307,7 +388,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 
 	var regs []Region
 
-	result := db.Select("code, name, contour, avg_price, ST_AsBinary(geom) as geom").Find(&regs)
+	result := db.Select("code, name, contour, avg_price").Find(&regs)
 
 	if result.Error != nil {
 		log.Errorf("GetRegionDetails err: %v\n", result.Error)
@@ -368,7 +449,7 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 
 	var deps []Department
 
-	result := db.Select("code, name, code_region, contour, avg_price, ST_AsBinary(geom) as geom").Find(&deps)
+	result := db.Select("code, name, contour, avg_price").Find(&deps)
 
 	if result.Error != nil {
 		log.Errorf("GetDepartmentDetails err: %v\n", result.Error)

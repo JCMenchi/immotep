@@ -208,6 +208,41 @@ func addRoutes(rg *gin.RouterGroup) {
 
 	})
 
+	rg.POST("/cities", func(c *gin.Context) {
+		if immotepDB == nil {
+			immotepDB = model.ConnectToDB(immotepDSN)
+		}
+
+		limit := -1
+
+		// get value from query param
+		var param POISQuery
+		if c.ShouldBindQuery(&param) == nil {
+			if param.Limit >= 0 {
+				limit = param.Limit
+			}
+		}
+
+		var body FilterInfoBody
+		err := c.BindJSON(&body)
+		if err != nil {
+			log.Printf("Error in POST /cities: %v\n", err)
+			c.JSON(500, "")
+			return
+		}
+
+		infos := model.GetCitiesFromBounds(immotepDB,
+			body.NorthEast.Lat, body.NorthEast.Long,
+			body.SouthWest.Lat, body.SouthWest.Long,
+			limit)
+
+		if infos == nil {
+			c.JSON(500, "[]")
+			return
+		}
+		c.JSON(200, infos)
+	})
+
 	rg.GET("/regions", func(c *gin.Context) {
 		if immotepDB == nil {
 			immotepDB = model.ConnectToDB(immotepDSN)

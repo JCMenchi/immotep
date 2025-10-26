@@ -4,8 +4,8 @@ import { createSlice } from '@reduxjs/toolkit';
 export const uiParam = createSlice({
   name: 'uiParam',
   initialState: {
-    queryLimit: localStorage.getItem('query_limit') || 100,
-    queryDepartment: localStorage.getItem('query_department') || "29",
+    queryLimit: localStorage.getItem('query_limit') || 50,
+    queryDepartment: localStorage.getItem('query_department') || "",
     theme: localStorage.getItem('ui_theme') || "dark",
     lang: localStorage.getItem('ui_lang') || "",
     currentPosition: JSON.parse(localStorage.getItem('ui_center')) || [48.6007, -4.0451],

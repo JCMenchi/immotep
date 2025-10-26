@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, act, waitFor, screen, fireEvent } from '@testing-library/react'
+import { render, act, waitFor } from '@testing-library/react'
 
 import { Provider } from 'react-redux';
 import { LocationMarker } from './LocationMarker'

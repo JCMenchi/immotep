@@ -11,8 +11,7 @@ import {
     changeAvgPrice,
     changeAvgPriceSQM,
     selectQueryDepartment,
-    selectQueryLimit,
-    selectYear
+    selectQueryLimit
 } from './store/uiparamSlice';
 
 export function computeCityContourStyle(feature) {
@@ -37,10 +36,8 @@ export const CityStat = () => {
     // state from redux global store
     const department = useSelector(selectQueryDepartment);
     const limit = useSelector(selectQueryLimit);
-    const year = useSelector(selectYear);
 
     const [cityInfos, setCityInfos] = useState(null)
-    const [_, setTransactions] = useState(null)
 
     // get reducer dispatcher
     const dispatch = useDispatch();
@@ -54,31 +51,31 @@ export const CityStat = () => {
             }
 
             // need to reload data with new bounds
-            service.get("api/cities?limit=600&dep=" + department)
+            /*service.get("api/cities?limit=600&dep=" + department)
                 .then((response) => {
                     setCityInfos(response.data);
                 }).catch((error) => {
                     console.error('Failed to load city info:', error);
                 });
-
-            service.post("api/pois/filter?limit=" + limit + "&year=" + year, bounds)
+*/
+            service.post("api/cities?limit=" + limit, bounds)
                 .then((response) => {
-                    const tr = response.data;
-                    setTransactions(tr.transactions);
-
-                    if (tr.avgprice > 0) {
-                        dispatch(changeAvgPrice(tr.avgprice));
+                    const infos = response.data;
+                    setCityInfos(infos.cities);
+             
+                    if (infos.avgprice > 0) {
+                        dispatch(changeAvgPrice(infos.avgprice));
                     } else {
                         dispatch(changeAvgPrice(-1));
                     }
-                    if (tr.avgprice_sqm > 0) {
-                        dispatch(changeAvgPriceSQM(tr.avgprice_sqm));
+                    if (infos.avgprice_sqm > 0) {
+                        dispatch(changeAvgPriceSQM(infos.avgprice_sqm));
                     } else {
                         dispatch(changeAvgPriceSQM(-1));
                     }
 
                 }).catch((error) => {
-                    console.error('Failed to load pois:', error);
+                    console.error('Failed to load cities:', error);
                 });
 
         }

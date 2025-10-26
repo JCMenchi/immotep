@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useSelector } from 'react-redux';
-import { LayersControl, LayerGroup, MapContainer, TileLayer, FeatureGroup } from "react-leaflet";
-import { EditControl } from "react-leaflet-draw";
+import { LayersControl, LayerGroup, MapContainer, TileLayer } from "react-leaflet";
 
 import { selectUITheme, selectCenterPosition } from './store/uiparamSlice';
 import { CityStat } from "./CityStat";
@@ -82,30 +81,17 @@ export const MapViewer = ({ initposition, initZoom }) => {
                         <LayerGroup><DepartmentStat /></LayerGroup>
                     </LayersControl.Overlay>
 
-                    <LayersControl.Overlay checked name="Communes Info">
+                    <LayersControl.Overlay name="Communes Info">
                         <LayerGroup><CityStat /></LayerGroup>
                     </LayersControl.Overlay>
 
-                    <LayersControl.Overlay name="Vente">
+                    <LayersControl.Overlay checked name="Vente">
                         <LayerGroup>
                             <LocationMarker />
                         </LayerGroup>
                     </LayersControl.Overlay>
 
-                    <LayersControl.Overlay checked name="Draw">
-                        <FeatureGroup>
-                            <EditControl position='bottomright'
-                                onEdited={(event) => {
-                                    console.log("Edit:", event);
-                                }}
-                                onCreated={(event) => {
-                                    console.log("Creat:", event);
-                                }}
-                                onDeleted={(event) => {
-                                    console.log("Delete:", event);
-                                }} />
-                        </FeatureGroup>
-                    </LayersControl.Overlay>
+                    
                 </LayersControl>
 
             </MapContainer>

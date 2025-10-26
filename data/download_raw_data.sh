@@ -16,12 +16,24 @@ fi
 # https://www.data.gouv.fr/fr/datasets/demandes-de-valeurs-foncieres/
 #
 
-DVF_BASE_URL=https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20240408-
+DVF_BASE_URL=https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20251018-
+
+if [ ! -f valeursfoncieres-2025-s1.txt ]; then
+    # static url https://www.data.gouv.fr/api/1/datasets/r/4d741143-8331-4b59-95c2-3b24a7bdbe3c
+    curl https://www.data.gouv.fr/api/1/datasets/r/4d741143-8331-4b59-95c2-3b24a7bdbe3c > valeursfoncieres-2025-S1.txt
+fi
+
+if [ ! -f valeursfoncieres-2024.txt ]; then
+    # static url https://www.data.gouv.fr/api/1/datasets/r/af812b0e-a898-4226-8cc8-5a570b257326
+    curl https://www.data.gouv.fr/api/1/datasets/r/af812b0e-a898-4226-8cc8-5a570b257326 > valeursfoncieres-2024.txt
+fi
 
 if [ ! -f valeursfoncieres-2023.txt ]; then
     # static url https://www.data.gouv.fr/fr/datasets/r/78348f03-a11c-4a6b-b8db-2acf4fee81b1
     curl ${DVF_BASE_URL}125738/valeursfoncieres-2023.txt > valeursfoncieres-2023.txt
 fi
+
+https://www.data.gouv.fr/datasets/demandes-de-valeurs-foncieres/#/resources/cc8a50e4-c8d1-4ac2-8de2-c1e4b3c44c86
 
 if [ ! -f valeursfoncieres-2022.txt ]; then
     # curl https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20221017-152027/valeursfoncieres-2022-s1.txt > valeursfoncieres-2022.txt

@@ -168,6 +168,9 @@ export default function Menubar() {
                     onChange={(event) => {
                         setCurrentAddress(event.target.value);
                     }}
+                    onBlur={() => {
+                        loadAddress(currentAddress);
+                    }}
                     onKeyUp={(event) => {
                         if (event.key == 'Enter') {
                             loadAddress(currentAddress);

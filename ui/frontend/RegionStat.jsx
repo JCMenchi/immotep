@@ -44,7 +44,7 @@ export const RegionStat = () => {
                         {`(${item.code}) ${item.name}: ${item.avgprice.toFixed(0)}€`}
                         {item.stat && Object.keys(item.stat).map((k) => {
                             return (
-                                <span>&nbsp; {k + ": " + item.stat[k]}<br /></span>
+                                <span key={k}>&nbsp; {k + ": " + item.stat[k]}<br /></span>
                             )
                         })
                         }
