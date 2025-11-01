@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from 'react-redux';
 import { LayersControl, LayerGroup, MapContainer, TileLayer } from "react-leaflet";
 
-import { selectUITheme, selectCenterPosition } from './store/uiparamSlice';
+import { selectCenterPosition } from './store/uiparamSlice';
 import { CityStat } from "./CityStat";
 import { LocationMarker } from "./LocationMarker";
 import { DepartmentStat } from "./DepartmentStat";
@@ -20,7 +20,7 @@ const mbtoken = "pk.eyJ1IjoiamNtZW5jaGkiLCJhIjoiY2tyaTQxOXZjMGM4YTJ1cnZ0ZGM0eWdl
 export const MapViewer = ({ initposition, initZoom }) => {
 
     const position = useSelector(selectCenterPosition);
-    const UITheme = useSelector(selectUITheme);
+    
     const [map, setMap] = useState(null);
 
     useEffect(() => {
@@ -41,34 +41,25 @@ export const MapViewer = ({ initposition, initZoom }) => {
             >
                 <LayersControl position="topright">
                     <LayersControl.BaseLayer checked name="Map">
-                        <TileLayer
+                        <TileLayer maxNativeZoom={18} maxZoom={22}
                             attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
                     </LayersControl.BaseLayer>
                     <LayersControl.BaseLayer name="Satellite">
-                        <TileLayer maxZoom={22}
+                        <TileLayer maxNativeZoom={18} maxZoom={22}
                             attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
                             url={mbbaseurl + "ckri48goh6zmf18q98pzmp1q4/tiles/{z}/{x}/{y}?access_token=" + mbtoken}
                         />
                     </LayersControl.BaseLayer>
-                    <LayersControl.BaseLayer name="Light">
-                        <TileLayer
-                            url={'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=' + mbtoken}
-                            id={UITheme === 'dark' ? 'mapbox/dark-v10' : 'mapbox/light-v10'}
-                            attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
-                            tileSize={512}
-                            zoomOffset={-1}
-                        />
-
-                    </LayersControl.BaseLayer>
-                    <LayersControl.BaseLayer name="GMaps">
-                        <TileLayer url='http://www.google.fr/maps/vt?lyrs=r&x={x}&y={y}&z={z}'
+                    
+                    <LayersControl.BaseLayer name="Terrain">
+                        <TileLayer maxNativeZoom={18} maxZoom={22} url='http://www.google.fr/maps/vt?lyrs=p&x={x}&y={y}&z={z}'
                             attribution='google'
                         />
                     </LayersControl.BaseLayer>
-                    <LayersControl.BaseLayer name="GMapsH">
-                        <TileLayer url='http://www.google.fr/maps/vt?lyrs=y&x={x}&y={y}&z={z}'
+                    <LayersControl.BaseLayer name="GSat">
+                        <TileLayer maxNativeZoom={18} maxZoom={22} url='http://www.google.fr/maps/vt?lyrs=y&x={x}&y={y}&z={z}'
                             attribution='google'
                         />
                     </LayersControl.BaseLayer>

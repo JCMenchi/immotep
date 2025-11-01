@@ -8,7 +8,6 @@ import {
     changeAvgPrice,
     changeAvgPriceSQM,
     changeZoom,
-    changePosition,
     selectQueryLimit,
     selectQueryDepartment,
     selectYear
@@ -24,9 +23,6 @@ export const LocationMarker = () => {
     // get reducer dispatcher
     const dispatch = useDispatch();
 
-    const [lastPos, setLastPos] = useState(null)
-    const [info, setInfo] = useState("")
-
     const [transactions, setTransactions] = useState(null)
 
     const map = useMapEvents({
@@ -37,10 +33,6 @@ export const LocationMarker = () => {
             console.log('map center:', map.getCenter())
             console.log('map bounds:', map.getBounds().getNorthEast(), map.getBounds().getSouthWest())
             console.log('map zoom:', map.getZoom())
-            dispatch(changePosition(map.getCenter()))
-
-            setLastPos(event.latlng)
-            setInfo(`latlong: ${event.latlng.lat}, ${event.latlng.lng}`)
         },
 
         moveend(_event) {
@@ -107,11 +99,6 @@ export const LocationMarker = () => {
 
     return (
         <div>
-            {lastPos !== null &&
-                <Marker position={lastPos}>
-                    <Popup><div>{info}</div></Popup>
-                </Marker>
-            }
             {transactions !== null && transactions.map(item => (
                 <Marker key={item.id} riseOnHover={true} position={[item.lat, item.long]} >
                     <Popup> {`${item.date.split('T')[0]}: ${item.price}€`} <br /> {`${item.area}m²`}<br /> {item.address} <br /> {item.city} </Popup>

@@ -6,18 +6,14 @@ import { useSelector, useDispatch } from 'react-redux';
 
 // MUI components
 import { Button, Grid, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
-import { Brightness7, Brightness4, LocationOnSharp } from '@mui/icons-material';
+import { LocationOnSharp } from '@mui/icons-material';
 
 // redux actions and selectors
 import {
-    selectUITheme,
-    changeUITheme,
     changeQueryLimit,
-    changeQueryDepartment,
     changePosition,
     changeYear,
     selectQueryLimit,
-    selectQueryDepartment,
     selectAvgPrice,
     selectAvgPriceSQM,
     selectYear
@@ -52,26 +48,12 @@ import service from './poi_service';
 export default function Menubar() {
     // state from redux global store
     const limit = useSelector(selectQueryLimit);
-    const department = useSelector(selectQueryDepartment);
     const avgprice = useSelector(selectAvgPrice);
     const avgpriceSQM = useSelector(selectAvgPriceSQM);
     const year = useSelector(selectYear);
 
     // get reducer dispatcher
     const dispatch = useDispatch();
-
-    const UITheme = useSelector(selectUITheme);
-
-    /**
-     * Toggles between light and dark UI themes
-     */
-    const toggleUITheme = () => {
-        if (UITheme === 'dark') {
-            dispatch(changeUITheme('light'));
-        } else {
-            dispatch(changeUITheme('dark'));
-        }
-    };
 
     /**
      * Uses browser geolocation API to set user's current position
@@ -87,7 +69,6 @@ export default function Menubar() {
 
     // Local state declarations
     const [ currentLimit, setCurrentLimit ] = useState(limit);
-    const [ currentDep, setCurrentDep ] = useState(department);
     const [ currentYear, setYear ] = useState(year);
     const [ currentAddress, setCurrentAddress ] = useState("");
     
@@ -219,29 +200,6 @@ export default function Menubar() {
                     </Select>
                </FormControl>
             </Grid>
-
-            <Grid style={{ flexGrow: 0 }}>
-                <TextField
-                    type='text'
-                    label={"Departement"}
-                    style={{ width: 110 }}
-                    value={currentDep}
-                    onChange={(event) => {
-                        setCurrentDep(event.target.value);
-                    }}
-                    onBlur={() => {
-                        dispatch(changeQueryDepartment(currentDep));
-                    }}
-                    onKeyUp={(event) => {
-                        if (event.key == 'Enter') {
-                            dispatch(changeQueryDepartment(currentDep));
-                        }
-                    }}
-                    disabled={false}
-                    variant='outlined'
-                    inputProps={{ style: { textAlign: 'right' } }}
-                />
-            </Grid>
             
             <Grid style={{ flexGrow: 0 }}>
                 <TextField
@@ -264,9 +222,6 @@ export default function Menubar() {
             </Grid>
            
             <Grid>
-                <IconButton id="change-theme-button" size="small" onClick={() => toggleUITheme()} >
-                  {UITheme === 'dark' ? <Brightness4 /> : <Brightness7 />}
-                </IconButton>
                 <IconButton size="small" onClick={() => findMe()} >
                   <LocationOnSharp />
                 </IconButton>
