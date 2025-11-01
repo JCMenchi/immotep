@@ -7,6 +7,12 @@
     enabled: true
   when: "'immotep.service' in ansible_facts.services"
 
+- name: Restart nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+    enabled: true
+
 - name: Reload immotep
   ansible.builtin.systemd:
     name: immotep

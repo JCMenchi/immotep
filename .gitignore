@@ -6,3 +6,4 @@ ui/.idea
 ui/stats.json
 ui/dist
 ui/coverage/
+install/ovh/ovhinv.ini

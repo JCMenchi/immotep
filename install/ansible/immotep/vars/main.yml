@@ -6,6 +6,9 @@ gcp_project: tutogc
 gcp_region: europe-west4
 gcp_zone: europe-west4-c
 
+web_server_url: www2.jcm.ovh
+email_for_certbot: jean.menchi@gmail.com
+
 pgdb_passwd: !vault |
           $ANSIBLE_VAULT;1.1;AES256
           33396133666330333937613836326637343566363766663931353664666438393064336437356166

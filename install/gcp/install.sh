@@ -61,6 +61,10 @@ else
 fi
 
 # install app
+
+cd ../ansible || exit 1
+# get vault password from gcp secret manager
 gcloud secrets versions access latest --secret=ansible-vault > ansible_vlt_pwd
-ansible-playbook --vault-password-file ansible_vlt_pwd -i gcpinv.ini immotep.yml
+ansible-playbook --vault-password-file ansible_vlt_pwd -i ../gcp/gcpinv.ini immotep.yml
 rm ansible_vlt_pwd
+cd ../gcp || exit 1

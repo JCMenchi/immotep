@@ -32,7 +32,7 @@ if [ ! -d /data/value ]; then
     mkdir /data/value
 fi
 cd /data/value || exit 2
-YEARS="2016 2017 2018 2019 2020 2021 2022 2023"
+YEARS="2016 2017 2018 2019 2020 2021 2022 2023 2024 2025-s1"
 for y in ${YEARS}; do
     if [ ! -f valeursfoncieres-"${y}".txt.loaded ]; then
         if [ -f ../valeursfoncieres-"${y}".txt.xz ]; then
