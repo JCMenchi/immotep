@@ -1,0 +1,109 @@
+import { useEffect, useState } from "react";
+import { useSelector } from 'react-redux';
+import { LayersControl, LayerGroup, MapContainer, TileLayer } from "react-leaflet";
+
+import { selectCenterPosition } from './store/uiparamSlice';
+import { CityStat } from "./CityStat";
+import { LocationMarker } from "./LocationMarker";
+import { DepartmentStat } from "./DepartmentStat";
+import { RegionStat } from "./RegionStat";
+
+const style = {
+    height: '100%',
+    width: '100%'
+};
+
+const mbbaseurl = "https://api.mapbox.com/styles/v1/jcmenchi/";
+
+const mbtoken = "pk.eyJ1IjoiamNtZW5jaGkiLCJhIjoiY2tyaTQxOXZjMGM4YTJ1cnZ0ZGM0eWdlbSJ9.Cqy-UGrsUUWAGF8mFPUiGg";
+
+export const MapViewer = ({ initposition, initZoom }) => {
+
+    const position = useSelector(selectCenterPosition);
+    
+    const [map, setMap] = useState(null);
+
+    useEffect(() => {
+        if (map) {
+            console.log("fly to :", position)
+            map.flyTo(position)
+        }
+    }, [position]);
+
+    return (
+        <div id="map" style={style}>
+            <MapContainer center={initposition}
+                zoom={initZoom}
+                maxZoom={22}
+                scrollWheelZoom={true}
+                style={style}
+                ref={setMap}
+            >
+                <LayersControl position="topright">
+                    <LayersControl.BaseLayer checked name="Map">
+                        <TileLayer maxNativeZoom={18} maxZoom={22}
+                            attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="Satellite">
+                        <TileLayer maxNativeZoom={18} maxZoom={22}
+                            attribution='&copy; <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
+                            url={mbbaseurl + "ckri48goh6zmf18q98pzmp1q4/tiles/{z}/{x}/{y}?access_token=" + mbtoken}
+                        />
+                    </LayersControl.BaseLayer>
+                    
+                    <LayersControl.BaseLayer name="Terrain">
+                        <TileLayer maxNativeZoom={18} maxZoom={22} url='http://www.google.fr/maps/vt?lyrs=p&x={x}&y={y}&z={z}'
+                            attribution='google'
+                        />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="GSat">
+                        <TileLayer maxNativeZoom={18} maxZoom={22} url='http://www.google.fr/maps/vt?lyrs=y&x={x}&y={y}&z={z}'
+                            attribution='google'
+                        />
+                    </LayersControl.BaseLayer>
+
+                    <LayersControl.Overlay name="Region Info">
+                        <LayerGroup><RegionStat /></LayerGroup>
+                    </LayersControl.Overlay>
+
+                    <LayersControl.Overlay name="Department Info">
+                        <LayerGroup><DepartmentStat /></LayerGroup>
+                    </LayersControl.Overlay>
+
+                    <LayersControl.Overlay name="Communes Info">
+                        <LayerGroup><CityStat /></LayerGroup>
+                    </LayersControl.Overlay>
+
+                    <LayersControl.Overlay checked name="Vente">
+                        <LayerGroup>
+                            <LocationMarker />
+                        </LayerGroup>
+                    </LayersControl.Overlay>
+
+                    
+                </LayersControl>
+
+            </MapContainer>
+        </div>
+    )
+}
+
+/*
+
+Result of call to GET /api/pois
+[
+    {
+        "id": 2145605,
+        "date": "2020-01-03T00:00:00Z",
+        "address": "14  HAM DES HAUTS DU GUERN",
+        "city": "LA FORET-FOUESNANT",
+        "price": 650000,
+        "area": 218,
+        "lat": 47.906863,
+        "long": -3.954772
+    }
+]
+
+*/

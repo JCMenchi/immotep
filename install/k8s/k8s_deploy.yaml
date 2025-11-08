@@ -1,0 +1,102 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immotep
+  labels:
+    app: immotep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immotep
+  template:
+    metadata:
+      name: immotep-main
+      labels:
+        app: immotep
+    spec:
+      containers:
+        - name: immotep
+          image: eu-zurich-1.ocir.io/zrubfvj5fjty/immotep:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: webui
+              containerPort: 8081
+          env:
+            - name: IMMOTEP_SERVE_PORT
+              value: "8081"
+            - name: IMMOTEP_DSN_TYPE
+              value: "pgsql"
+            - name: IMMOTEP_DSN_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: dbhost
+            - name: IMMOTEP_DSN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: username
+            - name: IMMOTEP_DSN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: password
+            - name: IMMOTEP_DSN_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: imm-pgsql
+                  key: database
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1000M
+              ephemeral-storage: "500M"
+            limits:
+              cpu: 1500m
+              memory: 1500M
+              ephemeral-storage: "1Gi"
+      imagePullSecrets:
+        - name: ociregistry
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immotep
+  labels:
+    app: immotep
+spec:
+  selector:
+    app: immotep
+  ports:
+    - port: 80
+      targetPort: 8081
+      protocol: TCP
+      name: webui
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: immotep-ing
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/issuer: "letsencrypt-prod"
+spec:
+  rules:
+  - host: 152.67.82.250.nip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: immotep
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - 152.67.82.250.nip.io
+    secretName: acmeprod-tls-secret

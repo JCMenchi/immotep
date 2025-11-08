@@ -1,0 +1,16 @@
+{
+    "plugins": ["plugins/markdown"],
+    "recurseDepth": 10,
+    "source": {
+        "includePattern": ".+\\.js$",
+        "excludePattern": "^__"
+    },
+    "markdown": {
+        "hardwrap": true
+    },
+    "sourceType": "module",
+    "tags": {
+        "allowUnknownTags": true,
+        "dictionaries": ["jsdoc","closure"]
+    }
+}

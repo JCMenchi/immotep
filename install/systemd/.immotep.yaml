@@ -1,0 +1,10 @@
+serve:
+  port: 80
+dsn:
+  type: pgsql
+  host: localhost
+  port: 5432
+  user: immotep
+  dbname: immdb
+  password: imm.pwd12
+  filename: ../data/imm.db

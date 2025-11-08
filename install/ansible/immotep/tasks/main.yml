@@ -1,0 +1,212 @@
+---
+# tasks file for immotep
+- name: Update and upgrade apt packages
+  become: true
+  ansible.builtin.apt:
+    upgrade: true
+    update_cache: true
+    cache_valid_time: 86400 # One day
+
+- name: Populate service facts
+  ansible.builtin.service_facts:
+
+- name: enable UFW
+  ufw:
+    state: enabled
+
+- ufw:
+    rule: allow
+    name: OpenSSH
+
+# Nginx
+- name: Install nginx & certbot
+  become: true
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - fail2ban
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- ufw:
+    rule: allow
+    name: "Nginx Full"
+
+- name: Get certificate for nginx
+  ansible.builtin.command: certbot --nginx -d {{ web_server_url }} -m  {{ email_for_certbot }} --agree-tos -n
+  args:
+    creates: /etc/letsencrypt/live/{{ web_server_url }}/fullchain.pem
+
+# Postgresql
+- name: Install postgresql
+  become: true
+  ansible.builtin.apt:
+    name:
+      - postgresql
+      - postgresql-16-postgis-3
+      - postgis
+      - postgresql-16-pgrouting
+      - python3-psycopg2 # lib used by ansible tasks for postgresql operation
+      - acl # needed to run task as postgres user
+    state: present
+
+- name: Create db role
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_user:
+    name: immotep
+    login_host: localhost
+    login_unix_socket: /var/run/postgresql
+    password: "{{ pgdb_passwd }}"
+    role_attr_flags: NOSUPERUSER
+
+- name: Create database
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_db:
+    name: immdb
+    comment: immotep db
+    owner: immotep
+    login_host: localhost
+    login_unix_socket: /var/run/postgresql
+
+- name: Add postgis extension
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_ext:
+    name: postgis
+    db: immdb
+
+- name: Add pgrouting extension
+  become: true
+  become_user: postgres
+  become_method: ansible.builtin.sudo
+  community.postgresql.postgresql_ext:
+    name: pgrouting
+    db: immdb
+
+# Create immotep user
+- name: Create immotep group
+  ansible.builtin.group:
+    name: immotep
+    state: present
+
+- name: Create immotep user
+  ansible.builtin.user:
+    name: immotep
+    groups: immotep
+    append: true
+    state: present
+    create_home: true
+
+# Collect raw data
+- name: Creates data directory
+  ansible.builtin.file:
+    path: /data
+    mode: 0777
+    owner: immotep
+    group: immotep
+    state: directory
+
+- name: Copy load script
+  ansible.builtin.copy:
+    src: load_data.sh
+    dest: /data/
+    mode: 0755
+    owner: immotep
+    group: immotep
+
+- name: Download geographical info
+  ansible.builtin.copy:
+    src: ../../../data/{{ item }}
+    dest: /data/{{ item }}
+    mode: 0444
+    owner: immotep
+    group: immotep
+  loop:
+    - departements.geojson.xz
+    - communes.geojson.xz
+    - communes.json.xz
+    - regions.geojson.xz
+
+- name: Download data
+  ansible.builtin.copy:
+    src: ../../../data/{{ item }}
+    dest: /data/{{ item }}
+    mode: 0444
+    owner: immotep
+    group: immotep
+  loop:
+    - valeursfoncieres-2016.txt.xz
+    - valeursfoncieres-2017.txt.xz
+    - valeursfoncieres-2018.txt.xz
+    - valeursfoncieres-2019.txt.xz
+    - valeursfoncieres-2020.txt.xz
+    - valeursfoncieres-2021.txt.xz
+    - valeursfoncieres-2022.txt.xz
+    - valeursfoncieres-2023.txt.xz
+    - valeursfoncieres-2024.txt.xz
+    - valeursfoncieres-2025-s1.txt.xz
+#
+# Create service
+- name: Copy env file
+  ansible.builtin.template:
+    src: files/immotep.env.j2
+    dest: /etc/default/immotep.env
+    mode: '400'
+    owner: immotep
+    group: immotep
+  notify:
+    - Restart immotep
+
+- name: Removing existing war
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify:
+    - Restart nginx
+
+- name: Copy nginx conf file
+  ansible.builtin.template:
+    src: files/immotep.nginx.j2
+    dest: /etc/nginx/sites-enabled/immotep
+    mode: '600'
+    owner: immotep
+    group: immotep
+  notify:
+    - Restart nginx
+
+- name: Copy systemd service file to server
+  ansible.builtin.copy:
+    src: immotep.service
+    dest: /etc/systemd/system
+    owner: root
+    group: root
+  notify:
+    - Reload immotep
+
+- name: Copy binary to server
+  ansible.builtin.copy:
+    src: ../../../srv/immotep
+    dest: /usr/bin
+    mode: '755'
+    owner: root
+    group: root
+  notify:
+    - Restart immotep
+
+- name: Set cap_net_bind_service 
+  community.general.capabilities:
+    path: /usr/bin/immotep
+    capability: cap_net_bind_service=ep
+    state: present
+
+- name: Start immotep
+  ansible.builtin.systemd:
+    name: immotep
+    state: started
+    enabled: true

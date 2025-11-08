@@ -1,0 +1,45 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+
+        {
+            "name": "Launch Chrome",
+            "request": "launch",
+            "type": "pwa-chrome",
+            "url": "http://localhost:5173/immotep/",
+            "webRoot": "${workspaceFolder}/ui"
+        },
+        {
+            "name": "backend",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}/srv",
+            "args": ["-f", "./imm.db", "serve"],
+            "program": "${workspaceFolder}/srv/main.go",
+            "debugAdapter": "dlv-dap"
+        },
+        {
+            "name": "geocode",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}/srv",
+            "args": ["geocode", "35"],
+            "program": "${workspaceFolder}/srv/main.go",
+            "debugAdapter": "dlv-dap"
+        }
+        ,
+        {
+            "name": "loadconf",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}/srv",
+            "args": ["loadconf", "loadconf", "--citygeo", "../data/communes.geojson", "--city", "../data/communes.json", "--region", "../data/regions.geojson", "--department", "../data/departements.geojson"],
+            "program": "${workspaceFolder}/srv/main.go",
+            "debugAdapter": "dlv-dap"
+        }
+    ]
+}

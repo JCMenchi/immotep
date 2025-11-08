@@ -1,0 +1,17 @@
+galaxy_info:
+  author: JC Menchi
+  description: install immotep service on ubuntu machine
+  company: your company (optional)
+
+  license: license BSD-3-Clause
+
+  min_ansible_version: 2.16
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+
+  galaxy_tags: []
+
+dependencies: []
