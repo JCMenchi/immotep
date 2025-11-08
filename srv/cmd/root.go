@@ -39,7 +39,7 @@ var cfgFile string
 
 var debugMode bool
 
-const VERSION = "1.0.0"
+const VERSION = "1.1.0"
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
