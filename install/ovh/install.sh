@@ -29,14 +29,15 @@ OS_IMAGE_NAME="Ubuntu 24.04"
 FLAVOR_NAME="d2-8"
 INSTANCE_NAME="immonode"
 DNS_DOMAIN=jcm.ovh
-SUB_DOMAIN="www2"
+SUB_DOMAIN="www"
 
 # get IDs
-PRJ_ID=$(ovhcloud cloud project list --format 'project_id+","+description' | grep "${PROJECT}" | cut -d',' -f1 | tr -d '"')
-FLAVOR_ID=$(ovhcloud cloud reference list-flavors --cloud-project "${PRJ_ID}" --region "${REGION}"  --filter 'available && osType=="linux"' --format '"flavor"+name+","+id' | grep "flavor${FLAVOR_NAME}" | cut -d',' -f2 | tr -d '"')
-IMAGE_ID=$(ovhcloud cloud reference list-images --cloud-project "${PRJ_ID}" --region "${REGION}" --filter "name==\"${OS_IMAGE_NAME}\" && status==\"active\" && type==\"linux\"" --format 'id' | tr -d '"')
+PRJ_ID=$(ovhcloud cloud project list --format 'project_id+","+description' 2>/dev/null | grep "${PROJECT}" | cut -d',' -f1 | tr -d '"')
+FLAVOR_ID=$(ovhcloud cloud reference list-flavors --cloud-project "${PRJ_ID}" --region "${REGION}"  --filter 'available && osType=="linux"' --format '"flavor"+name+","+id' 2>/dev/null | grep "flavor${FLAVOR_NAME}" | cut -d',' -f2 | tr -d '"')
+IMAGE_ID=$(ovhcloud cloud reference list-images --cloud-project "${PRJ_ID}" --region "${REGION}" --filter "name==\"${OS_IMAGE_NAME}\" && status==\"active\" && type==\"linux\"" --format 'id' 2>/dev/null | tr -d '"')
 
-#
+#DNS_DOMAIN=jcm.ovh
+SUB_DOMAIN="www"
 # create instance
 # 
 INSTANCE_ID=$(ovhcloud cloud instance list --cloud-project "${PRJ_ID}" -f 'id+","+name' 2>/dev/null | grep "${INSTANCE_NAME}" | cut -d',' -f1 | tr -d '"')
@@ -45,7 +46,10 @@ if [ -n "${INSTANCE_ID}" ]; then
     echo "Instance ${INSTANCE_NAME} exists (${INSTANCE_ID})."
 else
     echo "Creating instance ${INSTANCE_NAME}..."
-    ovhcloud cloud instance create "${REGION}" --cloud-project "${PRJ_ID}" --name "${INSTANCE_NAME}" --flavor "${FLAVOR_ID}" --boot-from.image "${IMAGE_ID}" --network.public --ssh-key.name "${SSH_KEY_NAME}"
+    ovhcloud cloud instance create "${REGION}" --cloud-project "${PRJ_ID}" --name "${INSTANCE_NAME}" --flavor "${FLAVOR_ID}" --boot-from.image "${IMAGE_ID}" --network.public --ssh-key.name "${SSH_KEY_NAME}" 2>/dev/null 
+    sleep 30
+    INSTANCE_ID=$(ovhcloud cloud instance list --cloud-project "${PRJ_ID}" -f 'id+","+name' 2>/dev/null | grep "${INSTANCE_NAME}" | cut -d',' -f1 | tr -d '"')
+    echo "Instance ${INSTANCE_NAME} created with ID (${INSTANCE_ID})."
 fi
 
 # get instance info
@@ -58,11 +62,12 @@ down=0
 while [ $i != 0 ]; do
     i=$(( i - 1 ))
 
+    INSTANCE_ID=$(ovhcloud cloud instance list --cloud-project "${PRJ_ID}" -f 'id+","+name' 2>/dev/null | grep "${INSTANCE_NAME}" | cut -d',' -f1 | tr -d '"')
     VM_PUBLLIC_IP=$(ovhcloud cloud instance  get $INSTANCE_ID  --json 2>/dev/null | jq '.["ipAddresses"][] | select( .version == 4 and .type == "public" ) .ip' | tr -d '"')
     down=$(nc -w 1 -z "${VM_PUBLLIC_IP}" 22 > /dev/null 2>&1; echo $?)
 
     if [ "${down}" != 0 ]; then
-        echo "Wait for ${VM_PUBLLIC_IP} do be ready..."
+        echo "Wait for ${INSTANCE_ID} ${VM_PUBLLIC_IP} do be ready..."
         sleep 10
     else
         i=0
@@ -106,17 +111,8 @@ echo "ansible_ssh_private_key_file=~/.ssh/ovh" >> ovhinv.ini
 # install app
 cd ../ansible || exit 1
 
-ansible-playbook --vault-password-file ansible_vlt_pwd -i ../ovh/ovhinv.ini immotep.yml
+ansible-playbook --vault-password-file ansible_vlt_pwd -e email_for_certbot="${CERTBOT_EMAIL}" -e web_server_url=${SUB_DOMAIN}.${DNS_DOMAIN} -i ../ovh/ovhinv.ini immotep.yml
 
 cd ../ovh || exit 1
 
-# certbot
-# run: sudo certbot --nginx -d www2.jcm.ovh -m jean.menchi@gmail.com --agree-tos -n
-# follow instructions to get certs
-# Successfully received certificate.
-# Certificate is saved at: /etc/letsencrypt/live/www2.jcm.ovh/fullchain.pem
-# Key is saved at:         /etc/letsencrypt/live/www2.jcm.ovh/privkey.pem
-
-#  location / {
-#        proxy_pass http://127.0.0.1:8080/;
-
+echo "Deployment completed. Access your app at https://${SUB_DOMAIN}.${DNS_DOMAIN}/"
