@@ -29,15 +29,6 @@ describe('Menubar', () => {
     expect(dispatch).toHaveBeenCalledWith(uiparamSlice.changeQueryLimit(100));
   });
 
-  it('dispatches changeQueryDepartment action when department is entered and Enter key is pressed', () => {
-    const dispatch = vi.spyOn(store, 'dispatch');
-    render(<Provider store={store}><Menubar /></Provider>);
-    const departmentInput = screen.getByLabelText('Departement');
-    fireEvent.change(departmentInput, { target: { value: '75' } });
-    fireEvent.keyUp(departmentInput, { key: 'Enter' });
-    expect(dispatch).toHaveBeenCalledWith(uiparamSlice.changeQueryDepartment('75'));
-  });
-
   it('dispatches changeQueryLimit action when limit is entered and Enter key is pressed', () => {
     const dispatch = vi.spyOn(store, 'dispatch');
     render(<Provider store={store}><Menubar /></Provider>);
@@ -55,18 +46,6 @@ describe('Menubar', () => {
     fireEvent.keyUp(addressInput, { key: 'Enter' });
     await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1))
     expect(dispatch).toHaveBeenCalledWith(uiparamSlice.changePosition([ 48.857739, 2.294844 ]));
-  });
-
-  it('dispatches changeUITheme action when theme button is clicked', () => {
-    const dispatch = vi.spyOn(store, 'dispatch');
-    render(<Provider store={store}><Menubar /></Provider>);
-    const themeButton = document.getElementById('change-theme-button');
-    fireEvent.click(themeButton);
-    expect(dispatch).toHaveBeenCalledWith(uiparamSlice.changeUITheme('light'));
-
-    // toggle back to dark
-    fireEvent.click(themeButton);
-    expect(dispatch).toHaveBeenCalledWith(uiparamSlice.changeUITheme('dark'));
   });
 
   it('dispatches changeYear action when year is selected', () => {

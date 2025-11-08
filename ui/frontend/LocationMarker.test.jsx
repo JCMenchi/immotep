@@ -52,7 +52,7 @@ describe('LocationMarker', () => {
     expect(service.post).toHaveBeenCalled()
   })
 
-  it('updates transactions when year, department or limit changes', async () => {
+  it('updates transactions when year or limit changes', async () => {
     await act(() => {render(
       <Provider store={store}>
         <MapContainer center={[48.6007, -4.0451]} zoom={10}>

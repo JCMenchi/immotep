@@ -9,7 +9,6 @@ import {
     changeAvgPriceSQM,
     changeZoom,
     selectQueryLimit,
-    selectQueryDepartment,
     selectYear
 } from './store/uiparamSlice';
 
@@ -17,7 +16,6 @@ export const LocationMarker = () => {
 
     // state from redux global store
     const limit = useSelector(selectQueryLimit);
-    const department = useSelector(selectQueryDepartment);
     const year = useSelector(selectYear);
 
     // get reducer dispatcher
@@ -39,8 +37,7 @@ export const LocationMarker = () => {
 
             const bounds = {
                 northEast: map.getBounds()._northEast,
-                southWest: map.getBounds()._southWest,
-                code: department
+                southWest: map.getBounds()._southWest
             }
             dispatch(changeZoom(map.getZoom()));
 
@@ -72,8 +69,7 @@ export const LocationMarker = () => {
     useEffect(() => {
         const bounds = {
             northEast: map.getBounds()._northEast,
-            southWest: map.getBounds()._southWest,
-            code: department
+            southWest: map.getBounds()._southWest 
         }
         // need to reload data
         service.post("api/pois/filter?limit=" + limit + "&year=" + year, bounds)
@@ -95,7 +91,7 @@ export const LocationMarker = () => {
             }).catch((error) => {
                 console.error('Failed to load pois:', error);
             });
-    }, [year, department, limit]);
+    }, [year, limit]);
 
     return (
         <div>

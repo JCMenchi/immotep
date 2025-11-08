@@ -38,7 +38,7 @@ describe('CityStat Component', () => {
     expect(text).toContain('2021: 5')
 
     // verify service is called correctly
-    expect(getSpy).toHaveBeenCalledWith('api/cities?limit=600&dep=29')
+    expect(getSpy).toHaveBeenCalledWith('api/cities?limit=600')
   })
 
   it('renders nothing (no GeoJSON) when service returns an error', async () => {

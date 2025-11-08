@@ -28,12 +28,11 @@ import service from './poi_service';
  * @component
  * @description
  * Displays average property prices, provides address search with geocoding,
- * year filtering (2016-2023), department filtering, query limit control,
+ * year filtering (2016-2023), query limit control,
  * UI theme toggle and geolocation finder.
  * 
  * Uses Redux for state management with the following global states:
  * - limit: Maximum number of query results
- * - department: Selected department code
  * - avgprice: Average property price
  * - avgpriceSQM: Average price per square meter
  * - year: Selected year filter
@@ -121,6 +120,7 @@ export default function Menubar() {
         .then((response) => {
             const features = response.data.features;
             if (features.length > 0) {
+                setCurrentAddress(features[0].properties.label);
                 const pos = features[0].geometry.coordinates;
                 console.log(features[0].properties, pos);
                 dispatch(changePosition([pos[1], pos[0]]))

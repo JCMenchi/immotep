@@ -10,7 +10,6 @@ import { useMapEvents } from "react-leaflet";
 import {
     changeAvgPrice,
     changeAvgPriceSQM,
-    selectQueryDepartment,
     selectQueryLimit
 } from './store/uiparamSlice';
 
@@ -34,7 +33,6 @@ export function computeCityContourStyle(feature) {
 export const CityStat = () => {
 
     // state from redux global store
-    const department = useSelector(selectQueryDepartment);
     const limit = useSelector(selectQueryLimit);
 
     const [cityInfos, setCityInfos] = useState(null)
@@ -46,18 +44,10 @@ export const CityStat = () => {
         moveend(_event) {
             const bounds = {
                 northEast: map.getBounds()._northEast,
-                southWest: map.getBounds()._southWest,
-                code: department
+                southWest: map.getBounds()._southWest
             }
 
             // need to reload data with new bounds
-            /*service.get("api/cities?limit=600&dep=" + department)
-                .then((response) => {
-                    setCityInfos(response.data);
-                }).catch((error) => {
-                    console.error('Failed to load city info:', error);
-                });
-*/
             service.post("api/cities?limit=" + limit, bounds)
                 .then((response) => {
                     const infos = response.data;
@@ -83,7 +73,7 @@ export const CityStat = () => {
     })
 
     useEffect(() => {
-        service.get("api/cities?limit=600&dep=" + department)
+        service.get("api/cities?limit=600")
             .then((response) => {
                 if (Array.isArray(response.data)) {
                     setCityInfos(response.data);
@@ -91,7 +81,7 @@ export const CityStat = () => {
             }).catch((error) => {
                 console.error('Failed to load city info:', error);
             });
-    }, [department]);
+    }, [limit]);
 
     return (
         <div>
