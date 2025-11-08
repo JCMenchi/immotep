@@ -1,3 +1,12 @@
+// Package model defines the database models and data-access / computation
+// helpers used by the immotep application.
+//
+// Responsibilities:
+//   - Define GORM models for transactions, cities, departments and regions.
+//   - Provide a ConnectToDB helper to open and migrate the DB (Postgres/SQLite).
+//   - Provide data access helpers to fetch transactions and aggregated
+//     information used by the REST API and CLI commands.
+//   - Provide utilities to update PostGIS geometry from stored GeoJSON contours.
 package model
 
 import (
@@ -20,6 +29,9 @@ BUG: in gorm CreateIndexAfterCreateTable is forced to true
 and autoIncrement is ignored if field is declared as primaryKey
 but if autoIncrement is set it becomes a primaryKey automagically
 */
+
+// Transaction represents a property transaction record persisted to the
+// transactions table.
 type Transaction struct {
 	TrId           uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
 	Date           time.Time `gorm:"index"`
@@ -39,6 +51,7 @@ type Transaction struct {
 	Long           float64 `gorm:"index"`
 }
 
+// Region stores region metadata and contour GeoJSON.
 type Region struct {
 	Code     string  `gorm:"primaryKey" json:"code"`
 	Name     string  `json:"nom"`
@@ -47,6 +60,7 @@ type Region struct {
 	City     []City  `gorm:"foreignKey:CodeRegion;references:Code"`
 }
 
+// Department stores department metadata and contour GeoJSON.
 type Department struct {
 	Code     string  `gorm:"primaryKey" json:"code"`
 	Name     string  `json:"nom"`
@@ -55,6 +69,7 @@ type Department struct {
 	City     []City  `gorm:"foreignKey:CodeDepartment;references:Code"`
 }
 
+// City stores city metadata, zipcode, aggregated avg price and contour.
 type City struct {
 	Code           string `gorm:"primaryKey" json:"code"`
 	Name           string `json:"nom"`
@@ -69,6 +84,16 @@ type City struct {
 	Geom           wkb.Geom `gorm:"type:geometry"`
 }
 
+// ConnectToDB opens a database connection using the provided DSN and performs
+// AutoMigrate for known models. It supports PostgreSQL (with PostGIS support)
+// and SQLite (file: or in-memory).
+//
+// Behavior:
+//   - For Postgres: opens connection, migrates schemas and updates the cities
+//     geometry column from stored contour GeoJSON.
+//   - For SQLite: opens connection and migrates schemas.
+//
+// Returns a *gorm.DB instance or nil on error.
 func ConnectToDB(dsn string) *gorm.DB {
 
 	if strings.HasPrefix(dsn, "postgres:") {
@@ -113,6 +138,8 @@ func ConnectToDB(dsn string) *gorm.DB {
 	return nil
 }
 
+// TransactionPOI is a lightweight view used to return transaction points-of-
+// interest in API responses. It maps to the transactions table.
 type TransactionPOI struct {
 	TrId      uint64    `gorm:"primaryKey" json:"id"`
 	Date      time.Time `json:"date"`
@@ -128,34 +155,50 @@ type TransactionPOI struct {
 	Cadastre  string    `json:"cadastre"`
 }
 
+// TableName specifies the underlying table name for TransactionPOI.
+//
+// It ensures GORM reads from the "transactions" table while using the
+// TransactionPOI structure for select projections.
 func (TransactionPOI) TableName() string {
 	return "transactions"
 }
 
-func GetPOI(db *gorm.DB, limit, zip int, dep string, after string) []TransactionPOI {
+// GetPOI returns a slice of TransactionPOI matching the provided filters.
+//
+// Parameters:
+// - db: active GORM DB connection
+// - limit: max rows to return (default 100 if <=0)
+// - zip: optional zipcode filter (0 = no filter)
+// - after: optional date string filter (only rows after this date)
+//
+// Returns:
+// - []TransactionPOI: slice of matching results or nil on DB error.
+func GetPOI(db *gorm.DB, limit, zip int, after string) []TransactionPOI {
 	if db == nil {
 		return nil
 	}
 
 	var pois []TransactionPOI
 
-	whereClause := "lat > 0"
-	if zip > 0 {
-		whereClause = fmt.Sprintf("%v AND zip_code = %v", whereClause, zip)
-	}
-	if dep != "" {
-		whereClause = fmt.Sprintf("%v AND department_code = %v", whereClause, dep)
-	}
+	whereClause := db.Where("lat > 0")
 
-	if after != "" {
-		whereClause = fmt.Sprintf("%v AND date > \"%v\"", whereClause, after)
+	if zip > 0 {
+		if after != "" {
+			whereClause = db.Where("lat > 0 AND zip_code = ? AND date > ?", zip, after)
+		} else {
+			whereClause = db.Where("lat > 0 AND zip_code = ?", zip)
+		}
+	} else {
+		if after != "" {
+			whereClause = db.Where("lat > 0 AND date > ?", after)
+		}
 	}
 
 	if limit <= 0 {
 		limit = 100
 	}
 
-	result := db.Where(whereClause).Limit(limit).Find(&pois)
+	result := whereClause.Limit(limit).Find(&pois)
 
 	if result.Error != nil {
 		log.Errorf("GetPOI err: %v\n", result.Error)
@@ -165,21 +208,32 @@ func GetPOI(db *gorm.DB, limit, zip int, dep string, after string) []Transaction
 	return pois
 }
 
+// BoundedTransactionInfo groups transactions within a bounding box together
+// with aggregated price statistics for that box.
 type BoundedTransactionInfo struct {
 	Trans       []TransactionPOI `json:"transactions"`
 	AvgPrice    float64          `json:"avgprice"`
 	AvgPriceSQM float64          `json:"avgprice_sqm"`
 }
 
-func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int, dep string, after string, year int) *BoundedTransactionInfo {
+// GetPOIFromBounds returns transactions within a geographic bounding box and
+// some aggregate statistics.
+//
+// Parameters:
+// - db: GORM DB connection
+// - NElat, NELong, SWlat, SWLong: coordinates defining the bounding box
+// - limit: maximum number of transactions to return (bounded 1..500)
+// - after: optional date filter (rows after this date)
+// - year: optional year filter; if provided it overrides 'after'
+//
+// Returns:
+//   - *BoundedTransactionInfo containing the matching transactions and averages,
+//     or nil on DB error.
+func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int, after string, year int) *BoundedTransactionInfo {
 
 	var info BoundedTransactionInfo
 
 	whereClause := fmt.Sprintf("lat < %v AND lat > %v AND long < %v AND long > %v", NElat, SWlat, NELong, SWLong)
-
-	if dep != "" {
-		whereClause = fmt.Sprintf("%v AND department_code = '%v'", whereClause, dep)
-	}
 
 	if year > 0 {
 		whereClause = fmt.Sprintf("%v AND date >= '%v-01-01' AND date < '%v-01-01'", whereClause, year, year+1)
@@ -224,12 +278,13 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 }
 
 /*
-*
-
-	SELECT tr.city as name,  avg(price_psqm) as ps, cities.contour as geojson FROM transactions as tr
-	LEFT JOIN cities ON tr.city_code = cities.code WHERE tr.department_code = 29
-	group by tr.city_code;
+SELECT tr.city as name,  avg(price_psqm) as ps, cities.contour as geojson FROM transactions as tr
+LEFT JOIN cities ON tr.city_code = cities.code WHERE tr.department_code = 29
+group by tr.city_code;
 */
+
+// CityInfo is a structure returned by GetCityDetails containing city meta,
+// contour and per-year statistics.
 type CityInfo struct {
 	Name        string           `json:"name"`
 	Code        string           `json:"code"`
@@ -240,6 +295,10 @@ type CityInfo struct {
 	Stat        map[int]string   `json:"stat"`
 }
 
+// GetCityDetails fetches city metadata and contour GeoJSON for either a single
+// department (dep != "") or a limited set (default limit 100).
+//
+// It also attaches a per-year summary (from CityYearlyAgg) into the Stat map.
 func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 	var cities []City
 
@@ -285,12 +344,24 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 	return cityinfos
 }
 
+// BoundedCityInfo returns cities intersecting a bounding box and aggregate
+// statistics for transactions in that box.
 type BoundedCityInfo struct {
 	Cities      []CityInfo `json:"cities"`
 	AvgPrice    float64    `json:"avgprice"`
 	AvgPriceSQM float64    `json:"avgprice_sqm"`
 }
 
+// GetCitiesFromBounds returns cities whose geometries intersect the provided
+// bounding box and includes per-city stats and aggregate transaction averages.
+//
+// Parameters:
+// - db: GORM DB connection
+// - NElat, NELong, SWlat, SWLong: bounding box coordinates
+// - limit: max number of cities to return (defaults/bounded)
+//
+// Returns:
+// - *BoundedCityInfo populated with city contours, stat maps and averages.
 func GetCitiesFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit int) *BoundedCityInfo {
 
 	var info BoundedCityInfo
@@ -359,6 +430,11 @@ func GetCitiesFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limi
 	return &info
 }
 
+// getCityStat returns a map of year -> formatted stat string for a city code.
+//
+// It reads CityYearlyAgg rows for the given city and formats values like:
+//
+//	"2022": "2500€/m² (3.2%)"
 func getCityStat(db *gorm.DB, s string) map[int]string {
 	var statMap map[int]string = make(map[int]string)
 
@@ -377,6 +453,8 @@ func getCityStat(db *gorm.DB, s string) map[int]string {
 	return statMap
 }
 
+// RegionInfo holds region details returned by GetRegionDetails including
+// contour and yearly stats.
 type RegionInfo struct {
 	Code        string           `json:"code"`
 	Name        string           `json:"name"`
@@ -385,6 +463,8 @@ type RegionInfo struct {
 	Stat        map[int]string   `json:"stat"`
 }
 
+// GetRegionDetails returns all regions with their contour feature and yearly
+// aggregated statistics (from RegionYearlyAgg).
 func GetRegionDetails(db *gorm.DB) []RegionInfo {
 
 	var regs []Region
@@ -420,6 +500,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 	return reginfos
 }
 
+// getRegionStat returns a map year -> formatted string for region aggregates.
 func getRegionStat(db *gorm.DB, s string) map[int]string {
 	var statMap map[int]string = make(map[int]string)
 
@@ -438,6 +519,7 @@ func getRegionStat(db *gorm.DB, s string) map[int]string {
 	return statMap
 }
 
+// DepartmentInfo holds department details returned by GetDepartmentDetails.
 type DepartmentInfo struct {
 	Name        string           `json:"name"`
 	Code        string           `json:"code"`
@@ -446,6 +528,8 @@ type DepartmentInfo struct {
 	Stat        map[int]string   `json:"stat"`
 }
 
+// GetDepartmentDetails returns departments with their contour feature and
+// yearly aggregated statistics (from DepartmentYearlyAgg).
 func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 
 	var deps []Department
@@ -481,6 +565,7 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 	return depinfos
 }
 
+// getDepartmentStat returns a map year -> formatted string for department aggregates.
 func getDepartmentStat(db *gorm.DB, s string) map[int]string {
 	var statMap map[int]string = make(map[int]string)
 

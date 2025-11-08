@@ -1,3 +1,7 @@
+// Package loader implements data-loading and geocoding helpers used by the
+// immotep application. This file contains utilities to geocode transactions
+// by sending CSV data to an external CSV-based geocoding endpoint and updating
+// the local database with returned coordinates and normalized address fields.
 package loader
 
 import (
@@ -18,53 +22,21 @@ import (
 	"jc.org/immotep/model"
 )
 
-/*
-map[
-    attribution:BAN
-    licence:ETALAB-2.0
-    limit:5
-    query:5156   PELUS SAINT-JEAN-SUR-REYSSOUZE
-    type:FeatureCollection
-    version:draft
-
-    features:[
-        map[
-            geometry:map[coordinates:[5.060514 46.387785]
-                            type:Point
-                            ]
-            properties:map[city:Saint-Jean-sur-Reyssouze
-                            citycode:01364
-                            context:01, Ain, Auvergne-Rhône-Alpes
-                            id:01364_0420
-                            importance:0.471
-                            label:Route des Pelus 01560 Saint-Jean-sur-Reyssouze
-                            name:Route des Pelus
-                            postcode:01560
-                            score:0.6136427061310782
-                            type:street
-                            x:858327.53
-							y:6.58960389e+06
-                            ]
-            type:Feature
-            ]
-        ]
-]
-
-curl -X POST -F data=@path/to/file.csv -F columns=voie -F columns=ville https://api-adresse.data.gouv.fr/search/csv/
-
-*/
-
+// ShapeGeometry represents the geometry portion of a geocoding feature.
+// Coordinates are ordered as [lon, lat].
 type ShapeGeometry struct {
 	Coordinates []float64 `json:"coordinates"`
 	FeatureType string    `json:"type"`
 }
 
+// GeoFeature models an individual feature returned by the geocoding service.
 type GeoFeature struct {
 	Geometry    ShapeGeometry `json:"geometry"`
 	Properties  interface{}   `json:"properties"`
 	FeatureType string        `json:"type"`
 }
 
+// GeoCodeInfo models the top-level JSON object returned by the geocoding service.
 type GeoCodeInfo struct {
 	Attribution string       `json:"attribution"`
 	Licence     string       `json:"licence"`
@@ -75,6 +47,7 @@ type GeoCodeInfo struct {
 	Features    []GeoFeature `json:"features"`
 }
 
+// CSV column indexes used to parse the geocoding CSV response.
 const LAT_INDEX = 4
 const LONG_INDEX = 3
 const ADDRESS_INDEX = 7
@@ -83,6 +56,21 @@ const CITYNAME_INDEX = 14
 const CITYCODE_INDEX = 16
 const STATUS_INDEX = 20
 
+// GeocodeDB queries the database for transactions to geocode, sends batches of
+// addresses to the external CSV geocoding service and updates the transactions
+// table with returned coordinates and normalized address fields.
+//
+// Parameters:
+//   - dsn: database connection string to open the DB
+//   - incremental: when true only geocode rows with lat == 0 (un-geocoded)
+//   - depcode: optional department code to filter the query (empty means no filter)
+//
+// Behavior:
+//   - Builds a GORM query according to incremental and depcode flags.
+//   - Processes results in batches, creates an in-memory CSV containing tr_id,
+//     Address and ZipCode fields, posts it to the geocoding service and parses
+//     the returned CSV.
+//   - Performs bulk updates using ON CONFLICT ... DO UPDATE on tr_id.
 func GeocodeDB(dsn string, incremental bool, depcode string) {
 
 	db := model.ConnectToDB(dsn)
@@ -212,8 +200,20 @@ func GeocodeDB(dsn string, incremental bool, depcode string) {
 	log.Infof("GeocodeDB: %v elt %v processed %v err.\n", count, nbprocessed, nbError)
 }
 
-var baseURL string = "https://data.geopf.fr/geocodage/search/csv"
+// geocodeBaseURL is the CSV-based geocoding endpoint used to resolve addresses.
+// The service accepts a multipart/form-data POST with a "data" file and a
+// "columns" form field describing which CSV column holds the address.
+var geocodeBaseURL string = "https://data.geopf.fr/geocodage/search/csv"
 
+// getGPSCoord posts a CSV payload to the external geocoding service and
+// returns a csv.Reader to parse the service's CSV response.
+//
+// Parameters:
+//   - csvdata: CSV-formatted string where each row contains trid, Address, ZipCode.
+//
+// Returns:
+//   - *csv.Reader to read the response CSV
+//   - error if the HTTP request or response parsing fails
 func getGPSCoord(csvdata string) (*csv.Reader, error) {
 
 	// create multipart body message
@@ -230,7 +230,7 @@ func getGPSCoord(csvdata string) (*csv.Reader, error) {
 	w.Close()
 
 	// send request
-	response, err := http.Post(baseURL, w.FormDataContentType(), requestBody)
+	response, err := http.Post(geocodeBaseURL, w.FormDataContentType(), requestBody)
 	if err != nil {
 		log.Errorf("getGPSCoord error in HTTP POST: %v\n", err)
 		return nil, err

@@ -1,3 +1,13 @@
+// Package model contains data models and computation routines for the immotep
+// application. This file implements routines to compute and persist aggregated
+// statistics (average price per square meter) for regions, departments and
+// cities based on transaction data.
+//
+// The functions in this file:
+// - ComputeRegions: compute and update avg_price on regions
+// - ComputeDepartments: compute and update avg_price on departments
+// - ComputeCities: compute and upsert avg_price on cities in batches
+// - ComputeStat: orchestrate the three computations using a DB connection
 package model
 
 import (
@@ -7,6 +17,12 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// ComputeRegions calculates the average price per square meter for each
+// region from transactions and updates the regions table.
+//
+// Behavior:
+// - Joins transactions -> cities -> regions and groups by region code.
+// - Updates the regions.avg_price column with the computed average.
 func ComputeRegions(db *gorm.DB) {
 	rows, err := db.Select("regions.name as name, regions.code as code, AVG(transactions.price_psqm) as avg_price_psqm").
 		Joins("LEFT JOIN cities ON cities.code = transactions.city_code").
@@ -46,6 +62,12 @@ func ComputeRegions(db *gorm.DB) {
 	}
 }
 
+// ComputeDepartments calculates the average price per square meter for each
+// department and updates the departments table.
+//
+// Behavior:
+// - Joins transactions -> departments and groups by department code.
+// - Updates the departments.avg_price column with the computed average.
 func ComputeDepartments(db *gorm.DB) {
 
 	rows, err := db.Select("departments.code as code, AVG(transactions.price_psqm) as avg_price_psqm").
@@ -85,6 +107,12 @@ func ComputeDepartments(db *gorm.DB) {
 	}
 }
 
+// ComputeCities computes average price per square meter for each city and
+// upserts the results into the cities table.
+//
+// Behavior:
+// - Aggregates transactions by city_code.
+// - Performs batched upserts into cities.avg_price using ON CONFLICT.
 func ComputeCities(db *gorm.DB) {
 
 	rows, err := db.Select("transactions.city_code as code, AVG(transactions.price_psqm) as avg_price_psqm").
@@ -126,7 +154,7 @@ func ComputeCities(db *gorm.DB) {
 			b = batchSize
 		}
 
-		batch := city2update[0:b]
+		batch := city2update[0:l]
 
 		updresult := db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "code"}},
@@ -148,6 +176,11 @@ func ComputeCities(db *gorm.DB) {
 	bar.Finish()
 }
 
+// ComputeStat orchestrates the computation of average price-per-sqm statistics
+// for regions, departments and cities using the provided DB connection.
+//
+// Behavior:
+// - Calls ComputeRegions, ComputeDepartments and ComputeCities in sequence.
 func ComputeStat(dsn string) {
 	db := ConnectToDB(dsn)
 	log.Infof("Compute Stat for Regions...\n")

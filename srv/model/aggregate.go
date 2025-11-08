@@ -1,22 +1,34 @@
-/*
-*
-
-Get all year with data
-select distinct(EXTRACT(year FROM date)) from transactions;
-
-Select EXTRACT(year FROM transactions.date) as year, transactions.city_code as code, MIN(cities.name) as name, AVG(transactions.price_psqm) as avg_price_psqm
-from transactions
-GROUP BY year, city_code;
-*/
+// Package model provides data models and aggregation routines for the immotep
+// application. This file defines yearly aggregate types and functions that
+// compute average price-per-square-meter and year-over-year increase for
+// cities, departments and regions.
+//
+// Aggregation strategy:
+//   - Use DB SQL to compute average price_psqm grouped by year and geographic
+//     unit (city_code, department_code, code_region).
+//   - Compute a simple relative increase compared to the previous year for the
+//     same geographic code.
+//   - Persist results into tables: city_yearly_aggs, department_yearly_aggs,
+//     region_yearly_aggs.
+//
+// Notes:
+//   - Aggregation reads from the transactions and geo tables (cities, regions,
+//     departments) via SQL JOINs.
+//   - Functions use GORM to manage schema and perform inserts in batches to keep
+//     memory usage reasonable.
 package model
 
 import (
+	"fmt"
+
 	"github.com/cheggaaa/pb/v3"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
+// CityYearlyAgg stores yearly aggregated statistics for a city.
+// Primary key is (Code, Year).
 type CityYearlyAgg struct {
 	Code     string  `gorm:"primaryKey" json:"code"`
 	Year     int     `gorm:"primaryKey" json:"year"`
@@ -25,6 +37,8 @@ type CityYearlyAgg struct {
 	Increase float64 `json:"increase"`
 }
 
+// DepartmentYearlyAgg stores yearly aggregated statistics for a department.
+// Primary key is (Code, Year).
 type DepartmentYearlyAgg struct {
 	Code     string  `gorm:"primaryKey" json:"code"`
 	Year     int     `gorm:"primaryKey" json:"year"`
@@ -33,6 +47,8 @@ type DepartmentYearlyAgg struct {
 	Increase float64 `json:"increase"`
 }
 
+// RegionYearlyAgg stores yearly aggregated statistics for a region.
+// Primary key is (Code, Year).
 type RegionYearlyAgg struct {
 	Code     string  `gorm:"primaryKey" json:"code"`
 	Year     int     `gorm:"primaryKey" json:"year"`
@@ -41,6 +57,12 @@ type RegionYearlyAgg struct {
 	Increase float64 `json:"increase"`
 }
 
+// AggregateData orchestrates the full aggregation process.
+//
+// It:
+// - Ensures aggregate tables exist (AutoMigrate).
+// - Clears any existing aggregate rows.
+// - Runs per-entity aggregation routines for cities, departments and regions.
 func AggregateData(dsn string) {
 	db := ConnectToDB(dsn)
 
@@ -58,14 +80,36 @@ func AggregateData(dsn string) {
 	log.Infof("All computation done.\n")
 }
 
+// cleanAggregate truncates the aggregate tables to remove any previous results.
+//
+// This ensures a fresh computation when AggregateData is called.
 func cleanAggregate(db *gorm.DB) {
 	db.Exec("TRUNCATE city_yearly_aggs;")
 	db.Exec("TRUNCATE region_yearly_aggs;")
 	db.Exec("TRUNCATE department_yearly_aggs;")
 }
 
+// aggregateCities computes yearly average price per sqm for each city and
+// inserts the results into the city_yearly_aggs table.
+//
+// Behavior:
+//   - Uses a SQL query joining transactions and cities, grouped by year and city.
+//   - Computes a simple year-over-year relative increase using the previous
+//     row's average for the same city code (as rows are ordered by code,year).
+//   - Inserts results in batches and shows a progress bar.
 func aggregateCities(db *gorm.DB) {
-	rows, err := db.Select("EXTRACT(year FROM transactions.date) as year, transactions.city_code as code, MIN(cities.name) as name, AVG(transactions.price_psqm) as avg_price_psqm").
+	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(cities.name) as name, AVG(transactions.price_psqm) as avg_price_psqm",
+		func() string {
+			if db.Dialector.Name() == "sqlite" {
+				log.Debugf("Using SQLITE year extract syntax.\n")
+				return SQLITE_QUERY_YEAR_EXTRACT
+			} else {
+				log.Debugf("Using POSTGRES year extract syntax.\n")
+				return POSTGRES_QUERY_YEAR_EXTRACT
+			}
+		}())
+
+	rows, err := db.Select(colList).
 		Table("transactions").
 		Joins("LEFT JOIN cities on cities.code = transactions.city_code").
 		Group("year").Group("transactions.city_code").
@@ -140,8 +184,28 @@ func aggregateCities(db *gorm.DB) {
 	bar.Finish()
 }
 
+const SQLITE_QUERY_YEAR_EXTRACT = "strftime('%Y', transactions.date)"
+const POSTGRES_QUERY_YEAR_EXTRACT = "EXTRACT(year FROM transactions.date)"
+
+// aggregateDepartments computes yearly average price per sqm for each department
+// and inserts the results into department_yearly_aggs.
+//
+// Implementation mirrors aggregateCities but joins on departments and uses
+// transactions.department_code as the grouping key.
 func aggregateDepartments(db *gorm.DB) {
-	rows, err := db.Select("EXTRACT(year FROM transactions.date) as year, transactions.department_code as code, MIN(departments.name) as name, AVG(transactions.price_psqm) as avg_price_psqm").
+
+	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(departments.name) as name, AVG(transactions.price_psqm) as avg_price_psqm",
+		func() string {
+			if db.Dialector.Name() == "sqlite" {
+				log.Debugf("Using SQLITE year extract syntax.\n")
+				return SQLITE_QUERY_YEAR_EXTRACT
+			} else {
+				log.Debugf("Using POSTGRES year extract syntax.\n")
+				return POSTGRES_QUERY_YEAR_EXTRACT
+			}
+		}())
+
+	rows, err := db.Select(colList).
 		Table("transactions").
 		Joins("LEFT JOIN departments on departments.code = transactions.department_code").
 		Group("year").Group("transactions.department_code").
@@ -216,8 +280,24 @@ func aggregateDepartments(db *gorm.DB) {
 	bar.Finish()
 }
 
+// aggregateRegions computes yearly average price per sqm for regions and writes
+// results into region_yearly_aggs.
+//
+// It joins transactions -> cities -> regions to obtain the region code and name.
 func aggregateRegions(db *gorm.DB) {
-	rows, err := db.Select("EXTRACT(year FROM transactions.date) as year, cities.code_region as code, MIN(regions.name) as name, AVG(transactions.price_psqm) as avg_price_psqm").
+
+	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(regions.name) as name, AVG(transactions.price_psqm) as avg_price_psqm",
+		func() string {
+			if db.Dialector.Name() == "sqlite" {
+				log.Debugf("Using SQLITE year extract syntax.\n")
+				return SQLITE_QUERY_YEAR_EXTRACT
+			} else {
+				log.Debugf("Using POSTGRES year extract syntax.\n")
+				return POSTGRES_QUERY_YEAR_EXTRACT
+			}
+		}())
+
+	rows, err := db.Select(colList).
 		Table("transactions").
 		Joins("LEFT JOIN cities on cities.code = transactions.city_code").
 		Joins("LEFT JOIN regions on cities.code_region = regions.code").

@@ -3,6 +3,10 @@ package loader
 import (
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
+	"jc.org/immotep/model"
 )
 
 func TestReadZipcodeMap(t *testing.T) {
@@ -171,4 +175,61 @@ func TestLoadCity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// helper to open a temporary sqlite DB and return db + dsn
+func openTestDB(t *testing.T) (*gorm.DB, string) {
+	t.Helper()
+	dsn := "file::memory:?cache=shared"
+	db := model.ConnectToDB(dsn)
+	if db == nil {
+		t.Fatalf("ConnectToDB returned nil for dsn %s", dsn)
+	}
+	// ensure yearly agg tables exist for some tests
+	db.AutoMigrate(&model.CityYearlyAgg{}, &model.DepartmentYearlyAgg{}, &model.RegionYearlyAgg{})
+	return db, dsn
+}
+
+// seed a minimal dataset:
+// city
+func seedMinimal(db *gorm.DB, t *testing.T) {
+	t.Helper()
+
+	db.Exec("DELETE FROM cities")
+
+	c := model.City{Code: "C1", Name: "City1", NameUpper: "CITY1", ZipCode: 75000, Population: 1000, Contour: "", CodeDepartment: "D1", CodeRegion: "R1"}
+
+	if err := db.Omit("Geom").Create(&c).Error; err != nil {
+		t.Fatalf("create city: %v", err)
+	}
+
+	c = model.City{Code: "C2", Name: "City2", NameUpper: "CITY2", ZipCode: 15000, Population: 100, Contour: "", CodeDepartment: "D2", CodeRegion: "R2"}
+
+	if err := db.Omit("Geom").Create(&c).Error; err != nil {
+		t.Fatalf("create city: %v", err)
+	}
+
+}
+
+func TestZipCodeConversion(t *testing.T) {
+	// call without DB connection
+	zpicode := getZipCodeFromCityCode("", "", "")
+	assert.Equal(t, -1, zpicode)
+
+	// call with empty db
+	db, dsn := openTestDB(t)
+	zpicode = getZipCodeFromCityCode(dsn, "", "")
+	assert.Equal(t, -1, zpicode)
+
+	// add data
+	seedMinimal(db, t)
+
+	zpicode = getZipCodeFromCityCode(dsn, "", "")
+	assert.Equal(t, -1, zpicode)
+
+	zpicode = getZipCodeFromCityCode(dsn, "C1", "")
+	assert.Equal(t, 75000, zpicode)
+
+	zpicode = getZipCodeFromCityCode(dsn, "", "CITY1")
+	assert.Equal(t, 75000, zpicode)
 }

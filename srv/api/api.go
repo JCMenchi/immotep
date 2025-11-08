@@ -1,3 +1,11 @@
+// Package api implements the HTTP server, routing and request handlers for the
+// immotep application. It exposes REST endpoints to query transactions (POIs),
+// cities, departments and regions and serves the UI static assets.
+//
+// Responsibilities:
+// - Build and configure a Gin router with API routes and static file serving.
+// - Manage a shared GORM DB connection used by handlers.
+// - Provide request/response payload types used by the API.
 package api
 
 import (
@@ -15,14 +23,30 @@ import (
 	"jc.org/immotep/model"
 )
 
-// store Postgresql connection
+// immotepDB holds the shared GORM DB connection used by handlers.
+// It is initialized by BuildRouter/Serve when a DSN is provided.
 var immotepDB *gorm.DB
+
+// immotepDSN stores the database connection string used to reconnect
+// lazily if immotepDB is nil inside handlers.
 var immotepDSN string
 
+// staticFS contains embedded UI assets used when no external staticDir is set.
+//
 //go:embed immotep/*
 var staticFS embed.FS
 
-// Start HTTP server
+// Serve starts the HTTP server.
+//
+// Parameters:
+//   - dsn: database connection string (Postgres or SQLite)
+//   - staticDir: path to local static assets directory; when empty, embedded assets are used
+//   - port: TCP port to listen on
+//   - debug: when true, enable Gin debug mode
+//
+// Behavior:
+//   - Builds the router, installs a signal handler (SIGINT/SIGTERM) to exit
+//     cleanly and runs the Gin engine listening on the specified port.
 func Serve(dsn string, staticDir string, port int, debug bool) {
 	router := BuildRouter(dsn, staticDir, debug)
 
@@ -42,6 +66,16 @@ func Serve(dsn string, staticDir string, port int, debug bool) {
 	router.Run(fmt.Sprintf(":%v", port)) // listen and serve on 0.0.0.0:${port}
 }
 
+// BuildRouter creates and configures a Gin engine with API routes and static
+// file serving. It also establishes a DB connection used by the handlers.
+//
+// Parameters:
+//   - dsn: database connection string used to initialise immotepDB
+//   - staticDir: when non-empty, local static files are served from this folder
+//   - debug: enable Gin debug mode when true
+//
+// Returns:
+//   - *gin.Engine: the configured Gin engine ready to Run().
 func BuildRouter(dsn, staticDir string, debug bool) *gin.Engine {
 
 	if debug {
@@ -81,18 +115,25 @@ func BuildRouter(dsn, staticDir string, debug bool) *gin.Engine {
 	return engine
 }
 
+// LatLongInfo represents a latitude/longitude pair used in JSON payloads.
+//
+// Fields are validated via Gin binding tags when used as handler parameters.
 type LatLongInfo struct {
 	Lat  float64 `json:"lat" binding:"required"`
 	Long float64 `json:"lng" binding:"required"`
 }
 
+// FilterInfoBody is the JSON body expected by spatial filter endpoints.
+//
+// It contains a bounding box (northEast / southWest), an optional department
+// code and an optional 'after' date string.
 type FilterInfoBody struct {
 	NorthEast LatLongInfo `json:"northEast" binding:"required"`
 	SouthWest LatLongInfo `json:"southWest" binding:"required"`
-	DepCode   string      `json:"code"`
 	After     string      `form:"after"`
 }
 
+// POISQuery models query parameters accepted by POI/city endpoints.
 type POISQuery struct {
 	Limit   int    `form:"limit"`
 	Year    int    `form:"year"`
@@ -101,6 +142,17 @@ type POISQuery struct {
 	After   string `form:"after"`
 }
 
+// addRoutes registers all API endpoints on the provided router group.
+//
+// It wires handlers for:
+//   - GET  /api/pois        : query POIs with optional filters
+//   - POST /api/pois/filter : bounding-box search for POIs
+//   - GET  /api/cities      : list cities (optional department filter)
+//   - POST /api/cities      : bounding-box search for cities
+//   - GET  /api/regions     : list regions
+//   - GET  /api/departments : list departments
+//
+// Handlers lazily ensure immotepDB is connected (reconnect using immotepDSN).
 func addRoutes(rg *gin.RouterGroup) {
 
 	/*
@@ -112,7 +164,6 @@ func addRoutes(rg *gin.RouterGroup) {
 		}
 
 		zip := -1
-		dep := ""
 		limit := -1
 		after := ""
 
@@ -126,18 +177,14 @@ func addRoutes(rg *gin.RouterGroup) {
 				zip = param.ZipCode
 			}
 
-			if param.DepCode != "" {
-				dep = param.DepCode
-			}
-
 			if param.After != "" {
 				after = param.After
 			}
 		}
 
-		pois := model.GetPOI(immotepDB, limit, zip, dep, after)
+		pois := model.GetPOI(immotepDB, limit, zip, after)
 		if pois == nil {
-			c.JSON(500, "[]")
+			c.JSON(500, []model.TransactionPOI{})
 			return
 		}
 		c.JSON(200, pois)
@@ -166,17 +213,17 @@ func addRoutes(rg *gin.RouterGroup) {
 		err := c.BindJSON(&body)
 		if err != nil {
 			log.Printf("Error in POST /pois/filter: %v\n", err)
-			c.JSON(500, "")
+			c.JSON(500, model.BoundedTransactionInfo{})
 			return
 		}
 
 		pois := model.GetPOIFromBounds(immotepDB,
 			body.NorthEast.Lat, body.NorthEast.Long,
 			body.SouthWest.Lat, body.SouthWest.Long,
-			limit, body.DepCode, body.After, year)
+			limit, body.After, year)
 
 		if pois == nil {
-			c.JSON(500, "[]")
+			c.JSON(500, model.BoundedTransactionInfo{})
 			return
 		}
 		c.JSON(200, pois)
@@ -227,7 +274,7 @@ func addRoutes(rg *gin.RouterGroup) {
 		err := c.BindJSON(&body)
 		if err != nil {
 			log.Printf("Error in POST /cities: %v\n", err)
-			c.JSON(500, "")
+			c.JSON(400, nil)
 			return
 		}
 
@@ -237,7 +284,7 @@ func addRoutes(rg *gin.RouterGroup) {
 			limit)
 
 		if infos == nil {
-			c.JSON(500, "[]")
+			c.JSON(500, nil)
 			return
 		}
 		c.JSON(200, infos)

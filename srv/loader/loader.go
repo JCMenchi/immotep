@@ -1,3 +1,12 @@
+// Package loader contains helpers to import raw property transaction data,
+// load geographic configuration (regions, departments, cities) and geocoding
+// support used by the immotep application.
+//
+// Responsibilities:
+// - Parse raw transaction CSVs and populate the transactions table.
+// - Read and import region/department/city geojson & JSON resources.
+// - Provide utilities to resolve zipcode from city codes.
+// - Support batching and progress reporting for large datasets.
 package loader
 
 import (
@@ -38,6 +47,8 @@ var COLUMNS_NAME = []string{
 	// 40             41                         42
 	"Nature culture", "Nature culture speciale", "Surface terrain"}
 
+// Column index constants used to extract fields from the raw pipe-separated
+// CSV rows produced by the French land registry dataset.
 var DATE_COL = 8
 var TYPE_VENTE_COL = 9
 var PRICE_COL = 10
@@ -58,13 +69,18 @@ var TYPE_CULTURE_COL = 40
 var FULL_AREA_COL = 42
 
 /*
-ReadZipcodeMap gets data from official zipcode list.
-Returns a map of zipcode by city name as integer.
+ReadZipcodeMap reads a semicolon-separated CSV mapping of official zipcode
+records and returns a map mapping city name variants to integer zip codes.
 
-Data store in CSV file with following layout:
+Input file layout expected (semicolon separated):
 
-#Code_commune_INSEE;Nom_de_la_commune;Code_postal;Libellé_d_acheminement;Ligne_5
-01001;L ABERGEMENT CLEMENCIAT;01400;L ABERGEMENT CLEMENCIAT;
+	Code_commune_INSEE;Nom_de_la_commune;Code_postal;Libellé_d_acheminement;Ligne_5
+
+Returns:
+  - map[string]int: mapping of city name and alternative city name (spaces -> '-') to zip code.
+
+Notes:
+  - Any file I/O or parse error returns an empty map.
 */
 func ReadZipcodeMap(filename string) map[string]int {
 	var zipCodeMap map[string]int = make(map[string]int)
@@ -109,6 +125,12 @@ func ReadZipcodeMap(filename string) map[string]int {
 	return zipCodeMap
 }
 
+/*
+lineCounter returns the number of lines in a file specified by filename.
+
+It reads the file in chunks and counts newline bytes. Returns an error if the
+file cannot be opened or an IO error occurs during reading.
+*/
 func lineCounter(filename string) (int, error) {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -137,6 +159,20 @@ func lineCounter(filename string) (int, error) {
 
 var badData [][]string = make([][]string, 0, 10)
 
+/*
+LoadRawData imports raw transaction rows from a pipe-separated CSV file into the
+transactions table.
+
+Parameters:
+  - dsn: database connection string used to open the DB
+  - filename: path to the raw CSV file
+
+Behavior:
+  - Counts lines to show progress.
+  - Iterates rows, filters for "Maison" sales with price and rooms.
+  - Removes obvious duplicates and batches inserts to the DB.
+  - Tracks and logs errors and statistics.
+*/
 func LoadRawData(dsn string, filename string) {
 
 	nbline, _ := lineCounter(filename)
@@ -237,7 +273,15 @@ func LoadRawData(dsn string, filename string) {
 }
 
 /*
-TODO: merge duplicate surface in main item
+checkNotDuplicate compares the current row with the previous row and returns
+false if the rows look like duplicates based on a set of key columns.
+
+Parameters:
+  - previousRow: the previously processed CSV row (may be nil/empty)
+  - row: current CSV row
+
+Returns:
+  - bool: true if the row is not a duplicate and should be processed.
 */
 func checkNotDuplicate(previousRow, row []string) bool {
 	if len(previousRow) != len(row) {
@@ -257,6 +301,21 @@ func checkNotDuplicate(previousRow, row []string) bool {
 	return true
 }
 
+/*
+createTransaction builds a model.Transaction from a parsed CSV row.
+
+Parameters:
+  - dsn: database connection string (used for zipcode lookup if ZIP absent)
+  - row: slice of string fields representing a CSV row
+
+Returns:
+  - *model.Transaction: populated transaction or nil if required fields are invalid.
+
+Behavior:
+  - Extracts address parts, numeric conversions for rooms, area, price.
+  - Computes price per sqm and constructs cadastre & city code fields.
+  - If critical data is missing or conversion fails, the row is appended to badData and nil is returned.
+*/
 func createTransaction(dsn string, row []string) *model.Transaction {
 	hasError := false
 
@@ -341,39 +400,17 @@ func createTransaction(dsn string, row []string) *model.Transaction {
 }
 
 /*
+LoadRegion imports regions from a GeoJSON file into the regions table.
 
-SELECT city, cadastre, date, MAX(price), MAX(price)/MAX(area) as ppsqm, COUNT(date) as Total
-FROM transactions
-GROUP BY city, cadastre, date
-HAVING Total > 2
-ORDER BY ppsqm;
+Parameters:
+  - dsn: DB connection string
+  - filename: path to regions geojson file
 
-SELECT zip_code, AVG(price_psqm) as ppsqm
-FROM transactions
-WHERE department_code = 29
-GROUP BY zip_code
-ORDER BY zip_code;
-
-HAVING Total > 2
-ORDER BY ppsqm;
-
-
-SELECT t1.department_code, perdep, errperdep, errperdep/perdep
-FROM
-(select department_code,count(*) as perdep
-from transactions group by department_code) t1
-LEFT JOIN
-(select department_code,count(*) as errperdep
-from transactions where nb_room = 0 group by department_code) t2
-ON (t1.department_code = t2.department_code);
-
-Feature property
-			"properties": {
-                "code": "75",
-                "nom": "Nouvelle-Aquitaine"
-            }
+Behavior:
+  - Skips import if regions table already contains rows.
+  - Parses features, extracts 'nom' and 'code' properties and stores the
+    whole feature JSON in the contour column.
 */
-
 func LoadRegion(dsn string, filename string) error {
 	// check if region already loaded
 	db := model.ConnectToDB(dsn)
@@ -441,26 +478,17 @@ func LoadRegion(dsn string, filename string) error {
 }
 
 /*
-				"properties": {
-	                "reg_code": "84",
-	                "dep_is_ctu": "Non",
-	                "dep_status": "urbain",
-	                "dep_name_upper": "LOIRE",
-	                "reg_name": "Auvergne-Rh\u00f4ne-Alpes",
-	                "geo_point_2d": [
-	                    45.7279998676,
-	                    4.16481278582
-	                ],
-	                "dep_current_code": "42",
-	                "dep_name_lower": "loire",
-	                "dep_code": "42",
-	                "dep_type": "d\u00e9partement",
-	                "year": "2021",
-	                "dep_area_code": "FXX",
-	                "dep_siren_code": "224200014",
-	                "dep_name": "Loire",
-	                "viewport": "{\"type\": \"Polygon\", \"coordinates\": [[[3.688420154, 45.231033918], [3.688420154, 46.276565491], [4.760377824, 46.276565491], [4.760377824, 45.231033918], [3.688420154, 45.231033918]]]}"
-	            }
+LoadDepartment imports department polygons from a GeoJSON file into the
+departments table.
+
+Parameters:
+  - dsn: DB connection string
+  - filename: path to departments geojson file
+
+Behavior:
+  - Skips import if departments table already contains rows.
+  - Only imports metropolitan departments (code length < 3).
+  - Stores the feature JSON in the contour column and persists rows in batches.
 */
 func LoadDepartment(dsn string, filename string) error {
 	// check if department already loaded
@@ -527,6 +555,20 @@ func LoadDepartment(dsn string, filename string) error {
 	return nil
 }
 
+/*
+LoadCity imports city metadata from a JSON file and associates GeoJSON contours
+from a companion geojson file.
+
+Parameters:
+  - dsn: DB connection string
+  - filename: path to the cities JSON (list of City structs)
+  - geofilename: path to the cities GeoJSON (feature collection with contours)
+
+Behavior:
+  - Skips import if cities table already contains rows.
+  - Normalizes city names (uppercase, strip accents) and populates zipcode.
+  - Persists city batches and updates the PostGIS geometry column from stored contour JSON.
+*/
 func LoadCity(dsn string, filename string, geofilename string) error {
 	// check if city already loaded
 	db := model.ConnectToDB(dsn)
@@ -633,12 +675,29 @@ func LoadCity(dsn string, filename string, geofilename string) error {
 	return nil
 }
 
+// CityInfo is a lightweight structure used when extracting city contour data.
 type CityInfo struct {
 	Name    string           `json:"nom"`
 	Code    string           `json:"code"`
 	Contour geojson.Geometry `json:"contour"`
 }
 
+/*
+getCityContour searches the provided geojson FeatureCollection for a feature
+matching the given cityCode and returns the serialized feature JSON (contour).
+
+Parameters:
+  - cityCode: INSEE city code to match
+  - communesgeo: geojson.FeatureCollection containing city features
+
+Returns:
+  - string: JSON representation of the matched feature
+  - error: if no matching contour is found
+
+Behavior:
+  - When a match is found, the function removes the matched feature from the
+    input slice to reduce subsequent search cost.
+*/
 func getCityContour(cityCode string, communesgeo geojson.FeatureCollection) (string, error) {
 
 	for idx, feature := range communesgeo.Features {
@@ -664,8 +723,24 @@ func getCityContour(cityCode string, communesgeo geojson.FeatureCollection) (str
 	return "", errors.New("no contour found")
 }
 
-func getZipCodeFromCityCode(dsn string, codeCity string, name string) int {
+/*
+getZipCodeFromCityCode attempts to resolve a zipcode given a city INSEE code
+and an optional city name.
+
+Parameters:
+  - dsn: DB connection string
+  - codeCity: INSEE city code (used to query cities table)
+  - uppername: city name (fallback lookup by normalized name)
+
+Returns:
+  - int: zipcode if found, otherwise -1
+*/
+func getZipCodeFromCityCode(dsn string, codeCity string, uppername string) int {
 	db := model.ConnectToDB(dsn)
+	if db == nil {
+		log.Errorf("getZipCodeFromCityCode err: cannot connect to DB: %v\n", dsn)
+		return -1
+	}
 
 	// build query
 	rows, err := db.Select("zip_code").
@@ -688,7 +763,7 @@ func getZipCodeFromCityCode(dsn string, codeCity string, name string) int {
 	}
 
 	rows2, err := db.Select("zip_code").
-		Where("name_upper = ?", name).
+		Where("name_upper = ?", uppername).
 		Table("cities").
 		Rows()
 

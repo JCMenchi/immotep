@@ -1,3 +1,22 @@
+// Package cmd implements the command-line interface for the immotep application.
+// It uses cobra & viper for command line parsing.
+//
+// The main commands provided are:
+// - load: Load raw data into the database
+// - loadconf: Load configuration data (regions, departments, cities)
+// - geocode: Geocode addresses in the database
+// - compute: Compute statistics on the data
+// - aggregate: Aggregate data for analysis
+// - serve: Start the REST API server & UI asset server
+//
+// Configuration can be provided via:
+// - Command line flags
+// - Config file ($HOME/.immotep.yaml by default)
+// - Environment variables (prefixed with IMMOTEP_)
+//
+// Database support includes:
+// - PostgreSQL: Using connection string format postgres://user:pass@host:port/dbname
+// - SQLite: Using file:filename or in-memory with file::memory:?cache=shared
 package cmd
 
 import (
@@ -20,63 +39,69 @@ var cfgFile string
 
 var debugMode bool
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
+const VERSION = "1.0.0"
+
+// RootCmd represents the base command when called without any subcommands
+var RootCmd = &cobra.Command{
 	Use:       "immotep",
 	Short:     "immotep",
 	Long:      `immotep.`,
-	Version:   "1.0.0",
+	Version:   VERSION,
 	ValidArgs: []string{"load", "serve"},
 }
 
-// Decode command line arguments
-// This is called by main.main().
+// Execute runs the root command. It is called by main.main() to start the application
+// and handles all command line parsing and validation.
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	cobra.CheckErr(RootCmd.Execute())
 }
 
-// Initialize cli flags and viper config
+// init initializes the command line interface by setting up all flags, commands,
+// and their bindings to viper configuration. It configures:
+// - Global flags for configuration and debugging
+// - Database connection parameters
+// - All subcommands (load, loadconf, geocode, serve, compute, aggregate)
 func init() {
 	cobra.OnInitialize(initConfig)
 
 	// define flags common to all commands
 
 	// define viper config file
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.immotep.yaml)")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.immotep.yaml)")
 
 	// debug
-	rootCmd.PersistentFlags().BoolVar(&debugMode, "debug", false, "activate debug logs")
+	RootCmd.PersistentFlags().BoolVar(&debugMode, "debug", false, "activate debug logs")
 
 	// define Database connection string
-	rootCmd.PersistentFlags().StringP("dsn-type", "t", "pgsql", "immotep Database type one of pgsql or sqlite (default pgsql)")
-	viper.BindPFlag("dsn.type", rootCmd.PersistentFlags().Lookup("dsn-type"))
+	RootCmd.PersistentFlags().StringP("dsn-type", "t", "pgsql", "immotep Database type one of pgsql or sqlite (default pgsql)")
+	viper.BindPFlag("dsn.type", RootCmd.PersistentFlags().Lookup("dsn-type"))
 	viper.SetDefault("dsn.type", "sqlite")
 
-	rootCmd.PersistentFlags().StringP("dsn-host", "H", "pgsql", "immotep Database Hostname")
-	viper.BindPFlag("dsn.host", rootCmd.PersistentFlags().Lookup("dsn-host"))
+	RootCmd.PersistentFlags().StringP("dsn-host", "H", "pgsql", "immotep Database Hostname")
+	viper.BindPFlag("dsn.host", RootCmd.PersistentFlags().Lookup("dsn-host"))
 	viper.SetDefault("dsn.host", "pgsql")
 
-	rootCmd.PersistentFlags().StringP("dsn-dbname", "d", "db", "immotep Database name")
-	viper.BindPFlag("dsn.dbname", rootCmd.PersistentFlags().Lookup("dsn-dbname"))
+	RootCmd.PersistentFlags().StringP("dsn-dbname", "d", "db", "immotep Database name")
+	viper.BindPFlag("dsn.dbname", RootCmd.PersistentFlags().Lookup("dsn-dbname"))
 	viper.SetDefault("dsn.dbname", "db")
 
-	rootCmd.PersistentFlags().IntP("dsn-port", "P", 5432, "immotep Database port")
-	viper.BindPFlag("dsn.port", rootCmd.PersistentFlags().Lookup("dsn-port"))
+	RootCmd.PersistentFlags().IntP("dsn-port", "P", 5432, "immotep Database port")
+	viper.BindPFlag("dsn.port", RootCmd.PersistentFlags().Lookup("dsn-port"))
 	viper.SetDefault("dsn.port", 5432)
 
-	rootCmd.PersistentFlags().StringP("dsn-user", "u", "", "immotep Database User Name")
-	viper.BindPFlag("dsn.user", rootCmd.PersistentFlags().Lookup("dsn-user"))
+	RootCmd.PersistentFlags().StringP("dsn-user", "u", "", "immotep Database User Name")
+	viper.BindPFlag("dsn.user", RootCmd.PersistentFlags().Lookup("dsn-user"))
 
-	rootCmd.PersistentFlags().StringP("dsn-password", "p", "", "immotep Database User password")
-	viper.BindPFlag("dsn.password", rootCmd.PersistentFlags().Lookup("dsn-password"))
+	RootCmd.PersistentFlags().StringP("dsn-password", "p", "", "immotep Database User password")
+	viper.BindPFlag("dsn.password", RootCmd.PersistentFlags().Lookup("dsn-password"))
 
-	rootCmd.PersistentFlags().StringP("dsn-filename", "f", "imm.db", "immotep Database file name (for SQLITE)")
-	viper.BindPFlag("dsn.filename", rootCmd.PersistentFlags().Lookup("dsn-filename"))
+	RootCmd.PersistentFlags().StringP("dsn-filename", "f", "imm.db", "immotep Database file name (for SQLITE)")
+	viper.BindPFlag("dsn.filename", RootCmd.PersistentFlags().Lookup("dsn-filename"))
 
 	// create subcommand
-	rootCmd.AddCommand(loadCmd)
+	RootCmd.AddCommand(loadCmd)
 
-	rootCmd.AddCommand(geocodeCmd)
+	RootCmd.AddCommand(geocodeCmd)
 
 	loadConfCmd.PersistentFlags().StringP("region", "r", "", "region GEOJSON file")
 	viper.BindPFlag("file.region", loadConfCmd.PersistentFlags().Lookup("region"))
@@ -86,19 +111,24 @@ func init() {
 	viper.BindPFlag("file.city", loadConfCmd.PersistentFlags().Lookup("city"))
 	loadConfCmd.PersistentFlags().String("citygeo", "", "city GEOJSON file")
 	viper.BindPFlag("file.citygeo", loadConfCmd.PersistentFlags().Lookup("citygeo"))
-	rootCmd.AddCommand(loadConfCmd)
+	RootCmd.AddCommand(loadConfCmd)
 
 	serveCmd.PersistentFlags().Int("port", 8080, "api server port")
 	viper.BindPFlag("serve.port", serveCmd.PersistentFlags().Lookup("port"))
 	serveCmd.PersistentFlags().String("static", "", "asset folder")
 	viper.BindPFlag("serve.static", serveCmd.PersistentFlags().Lookup("static"))
-	rootCmd.AddCommand(serveCmd)
+	RootCmd.AddCommand(serveCmd)
 
-	rootCmd.AddCommand(computeCmd)
-	rootCmd.AddCommand(aggregateCmd)
+	RootCmd.AddCommand(computeCmd)
+	RootCmd.AddCommand(aggregateCmd)
 }
 
-// initConfig reads in config file and ENV variables if set.
+// initConfig reads in configuration from config files and environment variables.
+// It searches for config in the following order:
+// 1. Specified config file via --config flag
+// 2. $HOME/.immotep.yaml
+// 3. Environment variables prefixed with IMMOTEP_
+// It also initializes logging based on debug mode.
 func initConfig() {
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -128,13 +158,12 @@ func initConfig() {
 	}
 }
 
-/*
-	Build database connection string
-
-e.g. postgres://user:userpwd@pgsql:5432/db?sslmode=disable
-
-	file:mydata.db
-*/
+// getDSN builds database connection string
+//
+// e.g.
+//
+//	postgres://user:userpwd@pgsql:5432/db?sslmode=disable
+//	sqlite file:mydata.db
 func getDSN() string {
 	dbtype := viper.GetString("dsn.type")
 
@@ -157,6 +186,9 @@ func getDSN() string {
 	return dsn
 }
 
+// loadCmd represents the command for loading raw data into the database.
+// Usage: immotep load [rawdatafile...]
+// It accepts multiple data files as arguments and loads them sequentially.
 var loadCmd = &cobra.Command{
 	Use:   "load [rawdatafile.]",
 	Short: "load raw data",
@@ -172,9 +204,15 @@ var loadCmd = &cobra.Command{
 	},
 }
 
-/*
-./immotep -f imm.db loadconf --region data/regions.geojson --department data/departements.geojson --city data/communes.json --citygeo data/communes.geojson
-*/
+// loadConfCmd represents the command for loading configuration data like regions,
+// departments, and cities into the database.
+// Usage: immotep loadconf [flags]
+// Flags:
+//
+//	--region: region GEOJSON file
+//	--department: department GEOJSON file
+//	--city: city JSON file
+//	--citygeo: city GEOJSON file
 var loadConfCmd = &cobra.Command{
 	Use:   "loadconf",
 	Short: "load config",
@@ -204,6 +242,10 @@ var loadConfCmd = &cobra.Command{
 	},
 }
 
+// geocodeCmd represents the command for geocoding addresses in the database.
+// Usage: immotep geocode [department...]
+// If no department is specified, it geocodes all entries.
+// If departments are specified, it only geocodes entries in those departments.
 var geocodeCmd = &cobra.Command{
 	Use:   "geocode",
 	Short: "geocode db",
@@ -223,6 +265,9 @@ var geocodeCmd = &cobra.Command{
 	},
 }
 
+// computeCmd represents the command for computing statistics on the data.
+// Usage: immotep compute
+// It processes the data and generates statistical computations stored in the database.
 var computeCmd = &cobra.Command{
 	Use:   "compute",
 	Short: "compute db",
@@ -235,6 +280,9 @@ var computeCmd = &cobra.Command{
 	},
 }
 
+// aggregateCmd represents the command for aggregating data for analysis.
+// Usage: immotep aggregate
+// It processes the data and creates aggregate views for analysis purposes.
 var aggregateCmd = &cobra.Command{
 	Use:   "aggregate",
 	Short: "aggregate db",
@@ -247,7 +295,14 @@ var aggregateCmd = &cobra.Command{
 	},
 }
 
-// serveCmd represents the serve command
+// serveCmd represents the command for starting the REST API server.
+// Usage: immotep serve [flags]
+// Flags:
+//
+//	--port: API server port (default 8080)
+//	--static: Static assets folder
+//
+// It starts an HTTP server that provides access to the immotep data via REST API.
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "immotep backend",
