@@ -237,13 +237,13 @@ func getGPSCoord(csvdata string) (*csv.Reader, error) {
 	}
 	defer response.Body.Close()
 
-	response_body, err := io.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	// parse CSV
-	reader := csv.NewReader(strings.NewReader(string(response_body)))
+	reader := csv.NewReader(strings.NewReader(string(responseBody)))
 	reader.LazyQuotes = true
 
 	return reader, nil

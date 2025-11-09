@@ -162,7 +162,7 @@ func initConfig() {
 //
 // e.g.
 //
-//	postgres://user:userpwd@pgsql:5432/db?sslmode=disable
+//	postgres://<user>:userpwd@pgsql:5432/db?sslmode=disable
 //	sqlite file:mydata.db
 func getDSN() string {
 	dbtype := viper.GetString("dsn.type")
@@ -170,7 +170,8 @@ func getDSN() string {
 	// by default use in mem db
 	dsn := "file::memory:?cache=shared"
 
-	if dbtype == "pgsql" {
+	switch dbtype {
+	case "pgsql":
 		dsn = "postgres://"
 		dsn += viper.GetString("dsn.user") + ":"
 		dsn += viper.GetString("dsn.password") + "@"
@@ -178,7 +179,7 @@ func getDSN() string {
 		dsn += fmt.Sprint(viper.GetInt("dsn.port")) + "/"
 		dsn += viper.GetString("dsn.dbname")
 		dsn += "?sslmode=disable"
-	} else if dbtype == "sqlite" {
+	case "sqlite":
 		dsn = "file:"
 		dsn += viper.GetString("dsn.filename")
 	}

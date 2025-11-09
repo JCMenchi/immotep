@@ -98,7 +98,7 @@ func cleanAggregate(db *gorm.DB) {
 //     row's average for the same city code (as rows are ordered by code,year).
 //   - Inserts results in batches and shows a progress bar.
 func aggregateCities(db *gorm.DB) {
-	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(cities.name) as name, AVG(transactions.price_psqm) as avg_price_psqm",
+	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(cities.name) as name, AVG(transactions.price_psqm) as avgPricePSQM",
 		func() string {
 			if db.Dialector.Name() == "sqlite" {
 				log.Debugf("Using SQLITE year extract syntax.\n")
@@ -128,27 +128,27 @@ func aggregateCities(db *gorm.DB) {
 	batchSize := 200
 	var city2update = make([]map[string]interface{}, 0, batchSize)
 
-	prev_avg := 0.0
-	prev_code := ""
+	prevAverage := 0.0
+	prevCode := ""
 
 	for rows.Next() {
 		var code string
 		var name string
-		var avg_price_psqm float64
+		var avgPricePSQM float64
 		var year int
 		increase := 0.0
 
-		rows.Scan(&year, &code, &name, &avg_price_psqm)
+		rows.Scan(&year, &code, &name, &avgPricePSQM)
 
-		if code == prev_code {
-			increase = (avg_price_psqm - prev_avg) / prev_avg
+		if code == prevCode {
+			increase = (avgPricePSQM - prevAverage) / prevAverage
 		}
-		prev_code = code
-		prev_avg = avg_price_psqm
+		prevCode = code
+		prevAverage = avgPricePSQM
 
-		city2update = append(city2update, map[string]interface{}{"year": year, "code": code, "name": name, "avg_price": avg_price_psqm, "increase": increase})
+		city2update = append(city2update, map[string]interface{}{"year": year, "code": code, "name": name, "avg_price": avgPricePSQM, "increase": increase})
 
-		log.Debugf("City (%v) year %v avg psqm: %.0f€\n", code, year, avg_price_psqm)
+		log.Debugf("City (%v) year %v avg psqm: %.0f€\n", code, year, avgPricePSQM)
 	}
 
 	if len(city2update) <= 0 {
@@ -194,7 +194,7 @@ const POSTGRES_QUERY_YEAR_EXTRACT = "EXTRACT(year FROM transactions.date)"
 // transactions.department_code as the grouping key.
 func aggregateDepartments(db *gorm.DB) {
 
-	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(departments.name) as name, AVG(transactions.price_psqm) as avg_price_psqm",
+	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(departments.name) as name, AVG(transactions.price_psqm) as avgPricePSQM",
 		func() string {
 			if db.Dialector.Name() == "sqlite" {
 				log.Debugf("Using SQLITE year extract syntax.\n")
@@ -224,27 +224,27 @@ func aggregateDepartments(db *gorm.DB) {
 	batchSize := 200
 	var dep2update = make([]map[string]interface{}, 0, batchSize)
 
-	prev_avg := 0.0
-	prev_code := ""
+	prevAverage := 0.0
+	prevCode := ""
 
 	for rows.Next() {
 		var code string
 		var name string
-		var avg_price_psqm float64
+		var avgPricePSQM float64
 		var year int
 		increase := 0.0
 
-		rows.Scan(&year, &code, &name, &avg_price_psqm)
+		rows.Scan(&year, &code, &name, &avgPricePSQM)
 
-		if code == prev_code {
-			increase = (avg_price_psqm - prev_avg) / prev_avg
+		if code == prevCode {
+			increase = (avgPricePSQM - prevAverage) / prevAverage
 		}
-		prev_code = code
-		prev_avg = avg_price_psqm
+		prevCode = code
+		prevAverage = avgPricePSQM
 
-		dep2update = append(dep2update, map[string]interface{}{"year": year, "code": code, "name": name, "avg_price": avg_price_psqm, "increase": increase})
+		dep2update = append(dep2update, map[string]interface{}{"year": year, "code": code, "name": name, "avg_price": avgPricePSQM, "increase": increase})
 
-		log.Debugf("Dep (%v) year %v avg psqm: %.0f€\n", code, year, avg_price_psqm)
+		log.Debugf("Dep (%v) year %v avg psqm: %.0f€\n", code, year, avgPricePSQM)
 	}
 
 	if len(dep2update) <= 0 {
@@ -286,7 +286,7 @@ func aggregateDepartments(db *gorm.DB) {
 // It joins transactions -> cities -> regions to obtain the region code and name.
 func aggregateRegions(db *gorm.DB) {
 
-	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(regions.name) as name, AVG(transactions.price_psqm) as avg_price_psqm",
+	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(regions.name) as name, AVG(transactions.price_psqm) as avgPricePSQM",
 		func() string {
 			if db.Dialector.Name() == "sqlite" {
 				log.Debugf("Using SQLITE year extract syntax.\n")
@@ -317,27 +317,27 @@ func aggregateRegions(db *gorm.DB) {
 	batchSize := 200
 	var region2update = make([]map[string]interface{}, 0, batchSize)
 
-	prev_avg := 0.0
-	prev_code := ""
+	prevAverage := 0.0
+	prevCode := ""
 
 	for rows.Next() {
 		var code string
 		var name string
-		var avg_price_psqm float64
+		var avgPricePSQM float64
 		var year int
 		increase := 0.0
 
-		rows.Scan(&year, &code, &name, &avg_price_psqm)
+		rows.Scan(&year, &code, &name, &avgPricePSQM)
 
-		if code == prev_code {
-			increase = (avg_price_psqm - prev_avg) / prev_avg
+		if code == prevCode {
+			increase = (avgPricePSQM - prevAverage) / prevAverage
 		}
-		prev_code = code
-		prev_avg = avg_price_psqm
+		prevCode = code
+		prevAverage = avgPricePSQM
 
-		region2update = append(region2update, map[string]interface{}{"year": year, "code": code, "name": name, "avg_price": avg_price_psqm, "increase": increase})
+		region2update = append(region2update, map[string]interface{}{"year": year, "code": code, "name": name, "avg_price": avgPricePSQM, "increase": increase})
 
-		log.Debugf("Dep (%v) year %v avg psqm: %.0f€\n", code, year, avg_price_psqm)
+		log.Debugf("Dep (%v) year %v avg psqm: %.0f€\n", code, year, avgPricePSQM)
 	}
 
 	if len(region2update) <= 0 {

@@ -80,7 +80,7 @@ func seedMinimal(db *gorm.DB, t *testing.T) {
 	}
 }
 
-func TestConnectToDB_SQLite(t *testing.T) {
+func TestConnectToDBSQLite(t *testing.T) {
 	db, _ := openTestDB(t)
 	if db == nil {
 		t.Fatal("expected db not nil")

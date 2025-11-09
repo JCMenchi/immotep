@@ -56,7 +56,7 @@ type Region struct {
 	Code     string  `gorm:"primaryKey" json:"code"`
 	Name     string  `json:"nom"`
 	Contour  string  `json:"contour"`
-	AvgPrice float64 `json:"avg_price"`
+	AvgPrice float64 `json:"avgPrice"`
 	City     []City  `gorm:"foreignKey:CodeRegion;references:Code"`
 }
 
@@ -65,7 +65,7 @@ type Department struct {
 	Code     string  `gorm:"primaryKey" json:"code"`
 	Name     string  `json:"nom"`
 	Contour  string  `json:"contour"`
-	AvgPrice float64 `json:"avg_price"`
+	AvgPrice float64 `json:"avgPrice"`
 	City     []City  `gorm:"foreignKey:CodeDepartment;references:Code"`
 }
 
@@ -79,7 +79,7 @@ type City struct {
 	Contour        string   `json:"contour"`
 	CodeDepartment string   `json:"codeDepartement"`
 	CodeRegion     string   `json:"codeRegion"`
-	AvgPrice       float64  `json:"avg_price"`
+	AvgPrice       float64  `json:"avgPrice"`
 	CodesPostaux   []string `gorm:"-" json:"codesPostaux"`
 	Geom           wkb.Geom `gorm:"type:geometry"`
 }
@@ -254,7 +254,7 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 		return nil
 	}
 
-	rows, err := db.Debug().Select("AVG(transactions.price) as avg_price, AVG(transactions.price_psqm) as avg_price_psqm").
+	rows, err := db.Debug().Select("AVG(transactions.price) as avgPrice, AVG(transactions.price_psqm) as avgPricePSQM").
 		Where("lat < ? AND lat > ? AND long < ? AND long > ?", NElat, SWlat, NELong, SWLong).
 		Table("transactions").
 		Rows()
@@ -266,12 +266,12 @@ func GetPOIFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limit i
 	defer rows.Close()
 
 	for rows.Next() {
-		var avg_price, avg_price_psqm float64
+		var avgPrice, avgPricePSQM float64
 
-		rows.Scan(&avg_price, &avg_price_psqm)
+		rows.Scan(&avgPrice, &avgPricePSQM)
 
-		info.AvgPrice = avg_price
-		info.AvgPriceSQM = avg_price_psqm
+		info.AvgPrice = avgPrice
+		info.AvgPriceSQM = avgPricePSQM
 	}
 
 	return &info
@@ -309,7 +309,7 @@ func GetCityDetails(db *gorm.DB, dep string) []CityInfo {
 		query = db.Limit(100)
 	}
 
-	result := query.Select("code, name, zip_code, population, contour, avg_price").Find(&cities)
+	result := query.Select("code, name, zip_code, population, contour, avgPrice").Find(&cities)
 
 	if result.Error != nil {
 		log.Errorf("GetCityDetails err: %v\n", result.Error)
@@ -375,7 +375,7 @@ func GetCitiesFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limi
 		limit = 500
 	}
 
-	result := db.Where(whereClause).Limit(limit).Select("code, name, zip_code, population, contour, avg_price").Find(&cities)
+	result := db.Where(whereClause).Limit(limit).Select("code, name, zip_code, population, contour, avgPrice").Find(&cities)
 
 	if result.Error != nil {
 		log.Errorf("GetCitiesFromBounds err: %v\n", result.Error)
@@ -407,7 +407,7 @@ func GetCitiesFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limi
 		}
 	}
 
-	rows, err := db.Debug().Select("AVG(transactions.price) as avg_price, AVG(transactions.price_psqm) as avg_price_psqm").
+	rows, err := db.Debug().Select("AVG(transactions.price) as avgPrice, AVG(transactions.price_psqm) as avgPricePSQM").
 		Where("lat < ? AND lat > ? AND long < ? AND long > ?", NElat, SWlat, NELong, SWLong).
 		Table("transactions").
 		Rows()
@@ -419,12 +419,12 @@ func GetCitiesFromBounds(db *gorm.DB, NElat, NELong, SWlat, SWLong float64, limi
 	defer rows.Close()
 
 	for rows.Next() {
-		var avg_price, avg_price_psqm float64
+		var avgPrice, avgPricePSQM float64
 
-		rows.Scan(&avg_price, &avg_price_psqm)
+		rows.Scan(&avgPrice, &avgPricePSQM)
 
-		info.AvgPrice = avg_price
-		info.AvgPriceSQM = avg_price_psqm
+		info.AvgPrice = avgPrice
+		info.AvgPriceSQM = avgPricePSQM
 	}
 
 	return &info
@@ -469,7 +469,7 @@ func GetRegionDetails(db *gorm.DB) []RegionInfo {
 
 	var regs []Region
 
-	result := db.Select("code, name, contour, avg_price").Find(&regs)
+	result := db.Select("code, name, contour, avgPrice").Find(&regs)
 
 	if result.Error != nil {
 		log.Errorf("GetRegionDetails err: %v\n", result.Error)
@@ -534,7 +534,7 @@ func GetDepartmentDetails(db *gorm.DB) []DepartmentInfo {
 
 	var deps []Department
 
-	result := db.Select("code, name, contour, avg_price").Find(&deps)
+	result := db.Select("code, name, contour, avgPrice").Find(&deps)
 
 	if result.Error != nil {
 		log.Errorf("GetDepartmentDetails err: %v\n", result.Error)

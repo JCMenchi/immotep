@@ -41,11 +41,11 @@ func ComputeRegions(db *gorm.DB) {
 
 	for rows.Next() {
 		var code, name string
-		var avg_price_psqm float64
+		var avgPricePerSQM float64
 
-		rows.Scan(&name, &code, &avg_price_psqm)
-		reginfos = append(reginfos, RegionInfo{Code: code, AvgPriceSQM: avg_price_psqm})
-		log.Debugf("Region avg psqm %v: %.0f€\n", name, avg_price_psqm)
+		rows.Scan(&name, &code, &avgPricePerSQM)
+		reginfos = append(reginfos, RegionInfo{Code: code, AvgPriceSQM: avgPricePerSQM})
+		log.Debugf("Region avg psqm %v: %.0f€\n", name, avgPricePerSQM)
 	}
 
 	if len(reginfos) <= 0 {
@@ -86,11 +86,11 @@ func ComputeDepartments(db *gorm.DB) {
 
 	for rows.Next() {
 		var code string
-		var avg_price_psqm float64
+		var avgPricePSQM float64
 
-		rows.Scan(&code, &avg_price_psqm)
-		depinfos = append(depinfos, DepartmentInfo{Code: code, AvgPriceSQM: avg_price_psqm})
-		log.Debugf("Department avg psqm %v: %.0f€\n", code, avg_price_psqm)
+		rows.Scan(&code, &avgPricePSQM)
+		depinfos = append(depinfos, DepartmentInfo{Code: code, AvgPriceSQM: avgPricePSQM})
+		log.Debugf("Department avg psqm %v: %.0f€\n", code, avgPricePSQM)
 	}
 
 	if len(depinfos) <= 0 {
@@ -131,13 +131,13 @@ func ComputeCities(db *gorm.DB) {
 
 	for rows.Next() {
 		var code string
-		var avg_price_psqm float64
+		var avgPricePSQM float64
 
-		rows.Scan(&code, &avg_price_psqm)
+		rows.Scan(&code, &avgPricePSQM)
 
-		city2update = append(city2update, map[string]interface{}{"code": code, "avg_price": avg_price_psqm})
+		city2update = append(city2update, map[string]interface{}{"code": code, "avg_price": avgPricePSQM})
 
-		log.Debugf("City (%v) avg psqm: %.0f€\n", code, avg_price_psqm)
+		log.Debugf("City (%v) avg psqm: %.0f€\n", code, avgPricePSQM)
 	}
 
 	if len(city2update) <= 0 {
