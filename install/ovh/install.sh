@@ -20,13 +20,14 @@ while getopts ":h?f" opt; do
     esac
 done
 
+npm install
 
 # set variables
 PROJECT="Project 2025-10-22"
 REGION=RBX-A
 SSH_KEY_NAME="jcmate"
 OS_IMAGE_NAME="Ubuntu 24.04"
-FLAVOR_NAME="d2-8"
+FLAVOR_NAME="d2-2"
 INSTANCE_NAME="immonode"
 DNS_DOMAIN=jcm.ovh
 SUB_DOMAIN="www"
@@ -87,7 +88,13 @@ CURRENT_IP=$(ovhcloud domain-zone get "${DNS_DOMAIN}" --json | jq ".[\"records\"
 if [ "${CURRENT_IP}" != "${VM_PUBLLIC_IP}" ]; then
     echo "Updating DNS record for ${SUB_DOMAIN}.${DNS_DOMAIN} to ${VM_PUBLLIC_IP} (was ${CURRENT_IP})"
     RECORD_ID=$(ovhcloud domain-zone get "${DNS_DOMAIN}" --json | jq ".[\"records\"][] | select(.fieldType == \"A\" and .subDomain==\"${SUB_DOMAIN}\").id" | tr -d '"')
-    ovhcloud domain-zone record update "${DNS_DOMAIN}" "${RECORD_ID}" --target "${VM_PUBLLIC_IP}"
+    if [ -z "${RECORD_ID}" ]; then
+        echo "DNS record for ${SUB_DOMAIN}.${DNS_DOMAIN} does not exist. Creating it."
+        node add_dns_record.js "${DNS_DOMAIN}" "${SUB_DOMAIN}" "${VM_PUBLLIC_IP}"
+    else
+        ovhcloud domain-zone record update "${DNS_DOMAIN}" "${RECORD_ID}" --target "${VM_PUBLLIC_IP}"
+    fi
+   
     ovhcloud domain-zone refresh "${DNS_DOMAIN}"
 else
     echo "DNS record for ${SUB_DOMAIN}.${DNS_DOMAIN} is up to date (${CURRENT_IP})"

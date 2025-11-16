@@ -79,7 +79,7 @@
   become_method: ansible.builtin.sudo
   community.postgresql.postgresql_ext:
     name: postgis
-    db: immdb
+    login_db: immdb
 
 - name: Add pgrouting extension
   become: true
@@ -87,7 +87,7 @@
   become_method: ansible.builtin.sudo
   community.postgresql.postgresql_ext:
     name: pgrouting
-    db: immdb
+    login_db: immdb
 
 # Create immotep user
 - name: Create immotep group
@@ -157,7 +157,7 @@
   ansible.builtin.template:
     src: files/immotep.env.j2
     dest: /etc/default/immotep.env
-    mode: '400'
+    mode: '444'
     owner: immotep
     group: immotep
   notify:
