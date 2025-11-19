@@ -9,7 +9,7 @@ let mockPosition = [47.906863, -3.954772]
 // mock react-redux useSelector to return mockPosition
 vi.mock('react-redux', () => {
   return {
-    useSelector: (selector) => {
+    useSelector: (_) => {
       return mockPosition
     }
   }

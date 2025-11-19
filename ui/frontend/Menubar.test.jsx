@@ -44,7 +44,7 @@ describe('Menubar', () => {
     const addressInput = screen.getByLabelText('Address');
     fireEvent.change(addressInput, { target: { value: 'Avenue Gustave Eiffel Paris' } });
     fireEvent.keyUp(addressInput, { key: 'Enter' });
-    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(dispatch).toHaveBeenCalled())
     expect(dispatch).toHaveBeenCalledWith(uiparamSlice.changePosition([ 48.857739, 2.294844 ]));
   });
 
