@@ -98,7 +98,7 @@ func cleanAggregate(db *gorm.DB) {
 //     row's average for the same city code (as rows are ordered by code,year).
 //   - Inserts results in batches and shows a progress bar.
 func aggregateCities(db *gorm.DB) {
-	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(cities.name) as name, AVG(transactions.price_psqm) as avgPricePSQM",
+	colList := fmt.Sprintf("%s as year, transactions.city_code as code, MIN(cities.name) as name, AVG(transactions.price_psqm) as avgPricePSQM",
 		func() string {
 			if db.Dialector.Name() == "sqlite" {
 				log.Debugf("Using SQLITE year extract syntax.\n")
@@ -286,7 +286,7 @@ func aggregateDepartments(db *gorm.DB) {
 // It joins transactions -> cities -> regions to obtain the region code and name.
 func aggregateRegions(db *gorm.DB) {
 
-	colList := fmt.Sprintf("%s as year, transactions.department_code as code, MIN(regions.name) as name, AVG(transactions.price_psqm) as avgPricePSQM",
+	colList := fmt.Sprintf("%s as year, cities.code_region as code, MIN(regions.name) as name, AVG(transactions.price_psqm) as avgPricePSQM",
 		func() string {
 			if db.Dialector.Name() == "sqlite" {
 				log.Debugf("Using SQLITE year extract syntax.\n")

@@ -3,6 +3,7 @@
     "configurations": [
 
 
+
         {
             "name": "Launch Chrome",
             "request": "launch",
@@ -16,7 +17,7 @@
             "request": "launch",
             "mode": "auto",
             "cwd": "${workspaceFolder}/srv",
-            "args": ["-f", "./imm.db", "serve"],
+            "args": ["--debug", "serve"],
             "program": "${workspaceFolder}/srv/main.go",
             "debugAdapter": "dlv-dap"
         },
@@ -26,11 +27,30 @@
             "request": "launch",
             "mode": "auto",
             "cwd": "${workspaceFolder}/srv",
-            "args": ["geocode", "35"],
+            "args": ["--debug", "geocode", "35"],
             "program": "${workspaceFolder}/srv/main.go",
             "debugAdapter": "dlv-dap"
-        }
-        ,
+        },
+        {
+            "name": "compute",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}/srv",
+            "args": ["--debug", "compute"],
+            "program": "${workspaceFolder}/srv/main.go",
+            "debugAdapter": "dlv-dap"
+        },
+        {
+            "name": "aggreagte",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}/srv",
+            "args": ["--debug", "aggregate"],
+            "program": "${workspaceFolder}/srv/main.go",
+            "debugAdapter": "dlv-dap"
+        },
         {
             "name": "loadconf",
             "type": "go",
